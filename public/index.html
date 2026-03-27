@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Gestão de Demandas</title>
+  <link rel="stylesheet" href="/css/style.css" />
+</head>
+<body>
+  <header>
+    <div class="header-inner">
+      <h1>📋 Gestão de Demandas</h1>
+      <span class="subtitle">via WhatsApp</span>
+    </div>
+  </header>
+
+  <main>
+    <!-- Stats -->
+    <section class="stats" id="stats">
+      <div class="stat-card"><span id="total-demandas">—</span><label>Total Ativas</label></div>
+      <div class="stat-card"><span id="pendentes">—</span><label>Aguardando Aceite</label></div>
+      <div class="stat-card"><span id="em-andamento">—</span><label>Em Andamento</label></div>
+      <div class="stat-card"><span id="aguardando-baixa">—</span><label>Aguardando Baixa</label></div>
+    </section>
+
+    <div class="layout">
+      <!-- Painel esquerdo: formulário + usuários -->
+      <aside class="sidebar">
+        <section class="card">
+          <h2>Nova Demanda</h2>
+          <form id="form-demanda">
+            <label>Solicitante
+              <select id="solicitante" required></select>
+            </label>
+            <label>Responsável
+              <select id="responsavel" required></select>
+            </label>
+            <label>Descrição
+              <textarea id="descricao" rows="3" required placeholder="Descreva a tarefa..."></textarea>
+            </label>
+            <label>Data Esperada
+              <input type="date" id="data-esperada" required />
+            </label>
+            <button type="submit" class="btn-primary">Criar Demanda</button>
+          </form>
+          <div id="form-msg" class="form-msg"></div>
+        </section>
+
+        <section class="card">
+          <h2>Usuários Cadastrados</h2>
+          <ul id="lista-usuarios" class="user-list"></ul>
+          <details style="margin-top:12px">
+            <summary>Adicionar Usuário</summary>
+            <form id="form-usuario">
+              <label>Nome <input type="text" id="u-nome" required /></label>
+              <label>Telefone (com DDI) <input type="text" id="u-telefone" placeholder="+5511999990001" required /></label>
+              <button type="submit" class="btn-secondary">Adicionar</button>
+            </form>
+            <div id="form-usuario-msg" class="form-msg"></div>
+          </details>
+        </section>
+      </aside>
+
+      <!-- Painel principal: lista de demandas -->
+      <section class="main-panel">
+        <div class="filter-bar">
+          <label>Filtrar por status:
+            <select id="filtro-status">
+              <option value="">Todos (exceto finalizados)</option>
+              <option value="pendente_aceite">Aguardando Aceite</option>
+              <option value="em_negociacao">Em Negociação</option>
+              <option value="aceita">Aceita</option>
+              <option value="em_andamento">Em Andamento</option>
+              <option value="concluida_aguardando_baixa">Aguardando Baixa</option>
+              <option value="finalizada">Finalizada</option>
+            </select>
+          </label>
+          <button class="btn-icon" id="btn-refresh" title="Atualizar">↻</button>
+        </div>
+
+        <div id="lista-demandas"></div>
+      </section>
+    </div>
+
+    <!-- Modal de detalhes -->
+    <div id="modal" class="modal hidden">
+      <div class="modal-content">
+        <button class="modal-close" id="modal-close">✕</button>
+        <div id="modal-body"></div>
+      </div>
+    </div>
+  </main>
+
+  <script src="/js/app.js"></script>
+</body>
+</html>
