@@ -71,12 +71,9 @@ async function carregarUsuarios() {
 async function carregarDemandas() {
   const qs = filtroStatus ? `?status=${filtroStatus}` : '';
   demandas = await api(`/api/demandas${qs}`);
-
   if (!filtroStatus) {
-    // Exibe todas exceto finalizadas por padrão
     demandas = demandas.filter(d => d.status !== 'finalizada');
   }
-
   renderDemandas();
   atualizarStats();
 }
@@ -93,17 +90,25 @@ function renderUsuarios() {
         <div style="color:var(--muted);font-size:.75rem">${u.telefone_whatsapp}</div>
       </div>
       <div style="display:flex;gap:4px">
-        <button class="btn-user-action" title="Editar" onclick="abrirEdicaoUsuario('${u.id}')">✏️</button>
-        <button class="btn-user-action" title="Excluir" onclick="excluirUsuario('${u.id}', '${u.nome}')">🗑️</button>
+        <button class="btn-user-action" data-acao="editar" data-id="${u.id}" title="Editar">✏️</button>
+        <button class="btn-user-action" data-acao="excluir" data-id="${u.id}" title="Excluir">🗑️</button>
       </div>
     </li>
   `).join('');
 }
 
+// Delegação de eventos para botões de usuário
+document.getElementById('lista-usuarios').addEventListener('click', async (e) => {
+  const btn = e.target.closest('[data-acao]');
+  if (!btn) return;
+  const id = btn.dataset.id;
+  if (btn.dataset.acao === 'editar') abrirEdicaoUsuario(id);
+  if (btn.dataset.acao === 'excluir') await excluirUsuario(id);
+});
+
 function abrirEdicaoUsuario(id) {
   const u = usuarios.find(x => x.id === id);
   if (!u) return;
-
   document.getElementById('edit-usuario-id').value = u.id;
   document.getElementById('edit-usuario-nome').value = u.nome;
   document.getElementById('edit-usuario-telefone').value = u.telefone_whatsapp;
@@ -112,13 +117,15 @@ function abrirEdicaoUsuario(id) {
   document.getElementById('edit-usuario-nome').focus();
 }
 
-async function excluirUsuario(id, nome) {
-  if (!confirm(`Excluir o usuário "${nome}"?`)) return;
+async function excluirUsuario(id) {
+  const u = usuarios.find(x => x.id === id);
+  if (!u) return;
+  if (!confirm(`Excluir o usuário "${u.nome}"?\n\nIsso removerá também todos os dados vinculados a ele.`)) return;
   try {
     await api(`/api/usuarios/${id}`, { method: 'DELETE' });
     await carregarUsuarios();
   } catch (e) {
-    alert('Erro ao excluir: ' + e.message);
+    alert('Erro ao excluir usuário:\n' + e.message);
   }
 }
 
@@ -143,7 +150,7 @@ function renderDemandas() {
   }
 
   container.innerHTML = demandas.map(d => `
-    <div class="demanda-card status-${d.status}" onclick="abrirModal('${d.id}')">
+    <div class="demanda-card status-${d.status}" data-id="${d.id}" style="cursor:pointer">
       <div class="demanda-header">
         <div class="demanda-descricao">${d.descricao}</div>
         <span class="demanda-badge badge-${d.status}">${statusLabel(d.status)}</span>
@@ -155,6 +162,13 @@ function renderDemandas() {
     </div>
   `).join('');
 }
+
+// Delegação de eventos para cards de demanda
+document.getElementById('lista-demandas').addEventListener('click', async (e) => {
+  const card = e.target.closest('.demanda-card');
+  if (!card) return;
+  await abrirModal(card.dataset.id);
+});
 
 // ── Stats ────────────────────────────────────────────────────────────────────
 
@@ -169,9 +183,12 @@ async function atualizarStats() {
   } catch (e) { /* silencioso */ }
 }
 
-// ── Modal ────────────────────────────────────────────────────────────────────
+// ── Modal de demanda ─────────────────────────────────────────────────────────
+
+let demandaAtualId = null;
 
 async function abrirModal(id) {
+  demandaAtualId = id;
   const modal = document.getElementById('modal');
   const body = document.getElementById('modal-body');
   modal.classList.remove('hidden');
@@ -182,8 +199,6 @@ async function abrirModal(id) {
       api(`/api/demandas/${id}`),
       api(`/api/demandas/${id}/mensagens`),
     ]);
-
-    const prazo = demanda.data_acordada || demanda.data_esperada;
 
     body.innerHTML = `
       <div class="modal-title">${demanda.descricao}</div>
@@ -216,8 +231,23 @@ async function abrirModal(id) {
         }
       </div>
 
-      ${renderAcoes(demanda)}
+      <div class="action-row" id="acoes-demanda">
+        ${renderAcoes(demanda)}
+      </div>
     `;
+
+    // Eventos dos botões de ação (via delegação)
+    document.getElementById('acoes-demanda').addEventListener('click', async (e) => {
+      const btn = e.target.closest('[data-acao]');
+      if (!btn) return;
+      const acao = btn.dataset.acao;
+      if (acao === 'excluir-demanda') {
+        await excluirDemanda(demanda.id, demanda.descricao);
+      } else {
+        await executarAcao(demanda.id, acao);
+      }
+    });
+
   } catch (e) {
     body.innerHTML = `<p style="color:#c0392b">Erro: ${e.message}</p>`;
   }
@@ -227,36 +257,22 @@ function renderAcoes(d) {
   const acoes = [];
 
   if (['pendente_aceite', 'em_negociacao'].includes(d.status)) {
-    acoes.push(`<button class="btn-aceitar" onclick="acao('${d.id}', 'aceitar')">✅ Aceitar</button>`);
+    acoes.push(`<button class="btn-aceitar" data-acao="aceitar">✅ Aceitar</button>`);
   }
   if (['aceita', 'em_andamento'].includes(d.status)) {
-    acoes.push(`<button class="btn-concluir" onclick="acao('${d.id}', 'concluir')">🎉 Concluir</button>`);
+    acoes.push(`<button class="btn-concluir" data-acao="concluir">🎉 Concluir</button>`);
   }
   if (d.status === 'concluida_aguardando_baixa') {
-    acoes.push(`<button class="btn-baixa" onclick="acao('${d.id}', 'baixa')">✔️ Dar Baixa</button>`);
+    acoes.push(`<button class="btn-baixa" data-acao="baixa">✔️ Dar Baixa</button>`);
   }
-
-  // Solicitante pode excluir demandas não finalizadas
   if (d.status !== 'finalizada') {
-    acoes.push(`<button class="btn-excluir-demanda" onclick="excluirDemanda('${d.id}', '${d.solicitante?.nome || ''}')">🗑️ Excluir</button>`);
+    acoes.push(`<button class="btn-excluir-demanda" data-acao="excluir-demanda">🗑️ Excluir</button>`);
   }
 
-  if (acoes.length === 0) return '';
-  return `<div class="action-row">${acoes.join('')}</div>`;
+  return acoes.join('');
 }
 
-async function excluirDemanda(id, solicitante) {
-  if (!confirm(`Excluir esta demanda?\n\nApenas o solicitante (${solicitante}) deve fazer isso.\n\nEsta ação não pode ser desfeita.`)) return;
-  try {
-    await api(`/api/demandas/${id}`, { method: 'DELETE' });
-    fecharModal();
-    await carregarDemandas();
-  } catch (e) {
-    alert('Erro ao excluir demanda: ' + e.message);
-  }
-}
-
-async function acao(id, tipo) {
+async function executarAcao(id, tipo) {
   try {
     await api(`/api/demandas/${id}/${tipo}`, { method: 'POST', body: {} });
     fecharModal();
@@ -266,8 +282,20 @@ async function acao(id, tipo) {
   }
 }
 
+async function excluirDemanda(id, descricao) {
+  if (!confirm(`Excluir a demanda:\n"${descricao}"?\n\nEsta ação não pode ser desfeita.`)) return;
+  try {
+    await api(`/api/demandas/${id}`, { method: 'DELETE' });
+    fecharModal();
+    await carregarDemandas();
+  } catch (e) {
+    alert('Erro ao excluir demanda:\n' + e.message);
+  }
+}
+
 function fecharModal() {
   document.getElementById('modal').classList.add('hidden');
+  demandaAtualId = null;
 }
 
 // ── Formulários ──────────────────────────────────────────────────────────────
@@ -279,7 +307,6 @@ document.getElementById('form-editar-usuario').addEventListener('submit', async 
     nome: document.getElementById('edit-usuario-nome').value.trim(),
     telefone_whatsapp: document.getElementById('edit-usuario-telefone').value.trim(),
   };
-
   try {
     await api(`/api/usuarios/${id}`, { method: 'PUT', body });
     document.getElementById('modal-usuario').classList.add('hidden');
@@ -297,7 +324,6 @@ document.getElementById('form-demanda').addEventListener('submit', async (e) => 
     descricao: document.getElementById('descricao').value,
     data_esperada: document.getElementById('data-esperada').value,
   };
-
   try {
     await api('/api/demandas', { method: 'POST', body });
     showMsg('form-msg', '✅ Demanda criada! Notificação WhatsApp enviada ao responsável.', 'ok');
@@ -314,7 +340,6 @@ document.getElementById('form-usuario').addEventListener('submit', async (e) => 
     nome: document.getElementById('u-nome').value,
     telefone_whatsapp: document.getElementById('u-telefone').value,
   };
-
   try {
     await api('/api/usuarios', { method: 'POST', body });
     showMsg('form-usuario-msg', '✅ Usuário adicionado!', 'ok');
