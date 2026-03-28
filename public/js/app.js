@@ -1,4 +1,28 @@
 const API = '';
+const AUTH_KEY = 'gestao_current_user';
+
+// ── Auth ─────────────────────────────────────────────────────────────────────
+
+function getCurrentUser() {
+  try {
+    const raw = localStorage.getItem(AUTH_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch { return null; }
+}
+
+function requireAuth() {
+  const user = getCurrentUser();
+  if (!user) {
+    window.location.href = `/login.html?redirect=${encodeURIComponent(window.location.pathname)}`;
+    return null;
+  }
+  return user;
+}
+
+function logout() {
+  localStorage.removeItem(AUTH_KEY);
+  window.location.href = '/login.html';
+}
 
 // ── Utilitários ──────────────────────────────────────────────────────────────
 
@@ -75,6 +99,7 @@ function showMsg(elId, msg, type = 'ok') {
 
 // ── Estado ───────────────────────────────────────────────────────────────────
 
+let currentUser = null;
 let usuarios = [];
 let demandas = [];
 let filtroStatus = '';
@@ -238,6 +263,11 @@ function popularSelects() {
   const opts = usuarios.map(u => `<option value="${u.id}">${u.nome}</option>`).join('');
   document.getElementById('solicitante').innerHTML = `<option value="">Selecionar...</option>${opts}`;
   document.getElementById('responsavel').innerHTML = `<option value="">Selecionar...</option>${opts}`;
+
+  // Pré-seleciona o usuário logado como solicitante
+  if (currentUser) {
+    document.getElementById('solicitante').value = currentUser.id;
+  }
 }
 
 // ── Render: Demandas ─────────────────────────────────────────────────────────
@@ -375,19 +405,30 @@ async function abrirModal(id) {
 }
 
 function renderAcoes(d) {
+  if (!currentUser) return '';
+
+  const ehResponsavel = currentUser.id === d.responsavel_id;
+  const ehSolicitante = currentUser.id === d.solicitante_id;
   const acoes = [];
 
-  if (['pendente_aceite', 'em_negociacao'].includes(d.status)) {
+  // Responsável: aceitar e concluir
+  if (ehResponsavel && ['pendente_aceite', 'em_negociacao'].includes(d.status)) {
     acoes.push(`<button class="btn-aceitar" data-acao="aceitar">✅ Aceitar</button>`);
   }
-  if (['aceita', 'em_andamento'].includes(d.status)) {
+  if (ehResponsavel && ['aceita', 'em_andamento'].includes(d.status)) {
     acoes.push(`<button class="btn-concluir" data-acao="concluir">🎉 Concluir</button>`);
   }
-  if (d.status === 'concluida_aguardando_baixa') {
+
+  // Solicitante: dar baixa e excluir
+  if (ehSolicitante && d.status === 'concluida_aguardando_baixa') {
     acoes.push(`<button class="btn-baixa" data-acao="baixa">✔️ Dar Baixa</button>`);
   }
-  if (d.status !== 'finalizada') {
+  if (ehSolicitante && d.status !== 'finalizada') {
     acoes.push(`<button class="btn-excluir-demanda" data-acao="excluir-demanda">🗑️ Excluir</button>`);
+  }
+
+  if (acoes.length === 0 && d.status !== 'finalizada') {
+    acoes.push(`<span style="font-size:.82rem;color:var(--text-muted)">Apenas visualização</span>`);
   }
 
   return acoes.join('');
@@ -395,7 +436,10 @@ function renderAcoes(d) {
 
 async function executarAcao(id, tipo) {
   try {
-    await api(`/api/demandas/${id}/${tipo}`, { method: 'POST', body: {} });
+    await api(`/api/demandas/${id}/${tipo}`, {
+      method: 'POST',
+      body: { usuario_id: currentUser?.id },
+    });
     fecharModal();
     await carregarDemandas();
   } catch (e) {
@@ -406,7 +450,8 @@ async function executarAcao(id, tipo) {
 async function excluirDemanda(id, descricao) {
   if (!confirm(`Excluir a demanda:\n"${descricao}"?\n\nEsta ação não pode ser desfeita.`)) return;
   try {
-    await api(`/api/demandas/${id}`, { method: 'DELETE' });
+    const qs = currentUser ? `?usuario_id=${currentUser.id}` : '';
+    await api(`/api/demandas/${id}${qs}`, { method: 'DELETE' });
     fecharModal();
     await carregarDemandas();
   } catch (e) {
@@ -520,9 +565,33 @@ document.getElementById('modal').addEventListener('click', (e) => {
 // ── Init ─────────────────────────────────────────────────────────────────────
 
 (async () => {
+  currentUser = requireAuth();
+  if (!currentUser) return;
+
+  // Mostra usuário logado no header
+  const headerInner = document.querySelector('.header-inner');
+  if (headerInner) {
+    const userBadge = document.createElement('div');
+    userBadge.style.cssText = 'display:flex;align-items:center;gap:10px;margin-left:auto';
+    userBadge.innerHTML = `
+      <span style="font-size:.85rem;color:var(--text-muted)">Olá, <strong style="color:var(--text)">${currentUser.nome.split(' ')[0]}</strong></span>
+      <button onclick="logout()" style="padding:5px 12px;background:transparent;border:1px solid var(--border);border-radius:6px;color:var(--text-muted);font-size:.8rem;cursor:pointer;font-family:inherit;transition:color .15s,border-color .15s" onmouseover="this.style.color='var(--danger)';this.style.borderColor='var(--danger)'" onmouseout="this.style.color='var(--text-muted)';this.style.borderColor='var(--border)'">Sair</button>
+    `;
+    headerInner.appendChild(userBadge);
+  }
+
+  // Pré-seleciona o solicitante como o usuário logado
+  document.getElementById('form-demanda').addEventListener('DOMContentLoaded', () => {}, { once: true });
+
   await carregarUsuarios();
   await carregarDemandas();
   carregarProximoRelatorio();
+
+  // Pré-seleciona solicitante após carregar usuários
+  const selSolicitante = document.getElementById('solicitante');
+  if (selSolicitante && currentUser) {
+    selSolicitante.value = currentUser.id;
+  }
 
   // Auto-refresh a cada 30 segundos
   setInterval(async () => {

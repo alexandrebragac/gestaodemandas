@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Entrar — Gestão de Demandas</title>
+  <link rel="stylesheet" href="/css/style.css" />
+  <style>
+    body { display: flex; align-items: center; justify-content: center; min-height: 100vh; background: var(--bg); }
+    .login-box {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 40px 36px;
+      width: 100%;
+      max-width: 380px;
+      box-shadow: 0 8px 32px rgba(0,0,0,.4);
+    }
+    .login-logo { text-align: center; margin-bottom: 28px; }
+    .login-logo h1 { font-size: 1.5rem; color: var(--text); margin: 0 0 4px; }
+    .login-logo p { font-size: .85rem; color: var(--text-muted); margin: 0; }
+    .login-box label { display: block; font-size: .82rem; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: .06em; margin-bottom: 8px; }
+    .login-box select {
+      width: 100%;
+      padding: 12px 14px;
+      background: var(--surface-3);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text);
+      font-size: 1rem;
+      font-family: inherit;
+      cursor: pointer;
+      appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' fill='none'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%238888aa' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 14px center;
+    }
+    .login-box select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-glow); }
+    .btn-login {
+      width: 100%;
+      padding: 13px;
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      font-size: 1rem;
+      font-weight: 700;
+      cursor: pointer;
+      margin-top: 20px;
+      font-family: inherit;
+      transition: background .15s, box-shadow .15s;
+    }
+    .btn-login:hover { background: var(--accent-hover); box-shadow: 0 0 0 3px var(--accent-glow); }
+    .btn-login:disabled { opacity: .5; cursor: not-allowed; }
+    .login-error { color: var(--danger); font-size: .85rem; text-align: center; margin-top: 10px; min-height: 20px; }
+  </style>
+</head>
+<body>
+  <div class="login-box">
+    <div class="login-logo">
+      <h1>📋 Gestão de Demandas</h1>
+      <p>Identifique-se para continuar</p>
+    </div>
+
+    <label for="select-usuario">Quem é você?</label>
+    <select id="select-usuario">
+      <option value="">Selecionar...</option>
+    </select>
+
+    <button class="btn-login" id="btn-entrar" disabled>Entrar</button>
+    <div class="login-error" id="login-error"></div>
+  </div>
+
+  <script>
+    const AUTH_KEY = 'gestao_current_user';
+
+    // Se já está logado, redireciona
+    try {
+      const existing = localStorage.getItem(AUTH_KEY);
+      if (existing) {
+        const redirect = new URLSearchParams(window.location.search).get('redirect') || '/';
+        window.location.href = redirect;
+      }
+    } catch (_) {}
+
+    const sel = document.getElementById('select-usuario');
+    const btn = document.getElementById('btn-entrar');
+    const errEl = document.getElementById('login-error');
+    let usuariosMap = {};
+
+    async function carregarUsuarios() {
+      try {
+        const res = await fetch('/api/usuarios');
+        const usuarios = await res.json();
+        usuarios.forEach(u => {
+          usuariosMap[u.id] = u;
+          const opt = document.createElement('option');
+          opt.value = u.id;
+          opt.textContent = u.nome;
+          sel.appendChild(opt);
+        });
+      } catch (e) {
+        errEl.textContent = 'Erro ao carregar usuários. Recarregue a página.';
+      }
+    }
+
+    sel.addEventListener('change', () => {
+      btn.disabled = !sel.value;
+    });
+
+    btn.addEventListener('click', () => {
+      const id = sel.value;
+      if (!id || !usuariosMap[id]) {
+        errEl.textContent = 'Selecione um usuário para continuar.';
+        return;
+      }
+      localStorage.setItem(AUTH_KEY, JSON.stringify(usuariosMap[id]));
+      const redirect = new URLSearchParams(window.location.search).get('redirect') || '/';
+      window.location.href = redirect;
+    });
+
+    carregarUsuarios();
+  </script>
+</body>
+</html>

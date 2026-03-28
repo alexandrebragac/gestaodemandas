@@ -129,6 +129,11 @@ router.post('/:id/aceitar', async (req, res) => {
   const demanda = db.prepare('SELECT * FROM demandas WHERE id = ?').get(req.params.id);
   if (!demanda) return res.status(404).json({ erro: 'Demanda não encontrada' });
 
+  const { usuario_id } = req.body;
+  if (usuario_id && usuario_id !== demanda.responsavel_id) {
+    return res.status(403).json({ erro: 'Apenas o responsável pode aceitar esta demanda' });
+  }
+
   if (![STATUS.PENDENTE_ACEITE, STATUS.EM_NEGOCIACAO].includes(demanda.status)) {
     return res.status(400).json({ erro: `Não é possível aceitar uma demanda com status "${demanda.status}"` });
   }
@@ -183,6 +188,11 @@ router.post('/:id/concluir', async (req, res) => {
   const demanda = db.prepare('SELECT * FROM demandas WHERE id = ?').get(req.params.id);
   if (!demanda) return res.status(404).json({ erro: 'Demanda não encontrada' });
 
+  const { usuario_id } = req.body;
+  if (usuario_id && usuario_id !== demanda.responsavel_id) {
+    return res.status(403).json({ erro: 'Apenas o responsável pode concluir esta demanda' });
+  }
+
   if (![STATUS.ACEITA, STATUS.EM_ANDAMENTO].includes(demanda.status)) {
     return res.status(400).json({ erro: `Não é possível concluir uma demanda com status "${demanda.status}"` });
   }
@@ -213,6 +223,11 @@ router.post('/:id/baixa', async (req, res) => {
   const demanda = db.prepare('SELECT * FROM demandas WHERE id = ?').get(req.params.id);
   if (!demanda) return res.status(404).json({ erro: 'Demanda não encontrada' });
 
+  const { usuario_id } = req.body;
+  if (usuario_id && usuario_id !== demanda.solicitante_id) {
+    return res.status(403).json({ erro: 'Apenas o solicitante pode dar baixa nesta demanda' });
+  }
+
   if (demanda.status !== STATUS.CONCLUIDA_AGUARDANDO_BAIXA) {
     return res.status(400).json({ erro: `Não é possível dar baixa em uma demanda com status "${demanda.status}"` });
   }
@@ -239,6 +254,11 @@ router.delete('/:id', (req, res) => {
   const db = getDb();
   const demanda = db.prepare('SELECT * FROM demandas WHERE id = ?').get(req.params.id);
   if (!demanda) return res.status(404).json({ erro: 'Demanda não encontrada' });
+
+  const usuario_id = req.query.usuario_id;
+  if (usuario_id && usuario_id !== demanda.solicitante_id) {
+    return res.status(403).json({ erro: 'Apenas o solicitante pode excluir esta demanda' });
+  }
 
   if (demanda.status === STATUS.FINALIZADA) {
     return res.status(400).json({ erro: 'Demandas finalizadas não podem ser excluídas.' });
