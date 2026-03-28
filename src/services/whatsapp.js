@@ -42,13 +42,18 @@ async function enviarMensagem(destinatario, mensagem) {
   const to = formatPhone(destinatario.telefone_whatsapp);
   const client = getClient();
 
+  // Sempre exibe o menu completo no final, evitando duplicatas
+  const corpo = mensagem.includes('*O que posso fazer:*')
+    ? mensagem
+    : mensagem + MENU_COMPLETO;
+
   if (!client) {
-    console.log(`[WhatsApp SIMULADO] Para: ${to}\n${mensagem}\n${'─'.repeat(50)}`);
+    console.log(`[WhatsApp SIMULADO] Para: ${to}\n${corpo}\n${'─'.repeat(50)}`);
     return;
   }
 
   try {
-    const msg = await client.messages.create({ from, to, body: mensagem });
+    const msg = await client.messages.create({ from, to, body: corpo });
     console.log(`[WhatsApp] Mensagem enviada para ${to}: ${msg.sid}`);
   } catch (err) {
     console.error(`[WhatsApp] Erro ao enviar para ${to}:`, err.message);
@@ -67,8 +72,7 @@ async function notificarNovaDeamanda(responsavel, solicitante, demanda) {
     `─────────────────\n` +
     `*Responda com:*\n` +
     `*1* — Aceitar\n` +
-    `*2* — Propor novo prazo` +
-    MENU_COMPLETO;
+    `*2* — Propor novo prazo`;
   await enviarMensagem(responsavel, msg);
 }
 
@@ -78,8 +82,7 @@ async function notificarAceite(solicitante, responsavel, demanda) {
     `${responsavel.nome} aceitou:\n` +
     `"${demanda.descricao}"\n` +
     `Prazo acordado: ${formatarData(demanda.data_acordada)}\n\n` +
-    `💬 Falar com ${responsavel.nome.split(' ')[0]}: ${linkWhatsApp(responsavel)}` +
-    MENU_COMPLETO;
+    `💬 Falar com ${responsavel.nome.split(' ')[0]}: ${linkWhatsApp(responsavel)}`;
   await enviarMensagem(solicitante, msg);
 }
 
@@ -94,8 +97,7 @@ async function notificarNovoPrazo(solicitante, responsavel, demanda) {
     `─────────────────\n` +
     `*Responda com:*\n` +
     `*1* — Aceitar o novo prazo\n` +
-    `*2* — Propor outro prazo` +
-    MENU_COMPLETO;
+    `*2* — Propor outro prazo`;
   await enviarMensagem(solicitante, msg);
 }
 
@@ -107,8 +109,7 @@ async function notificarConclusao(solicitante, responsavel, demanda) {
     `💬 Falar com ${responsavel.nome.split(' ')[0]}: ${linkWhatsApp(responsavel)}\n` +
     `─────────────────\n` +
     `*Responda com:*\n` +
-    `*4* — Confirmar e dar baixa` +
-    MENU_COMPLETO;
+    `*4* — Confirmar e dar baixa`;
   await enviarMensagem(solicitante, msg);
 }
 
@@ -117,8 +118,7 @@ async function notificarBaixa(responsavel, solicitante, demanda) {
     `✔️ *Baixa Confirmada!*\n\n` +
     `${solicitante.nome} confirmou a conclusão de:\n` +
     `"${demanda.descricao}"\n\n` +
-    `Demanda finalizada com sucesso!` +
-    MENU_COMPLETO;
+    `Demanda finalizada com sucesso!`;
   await enviarMensagem(responsavel, msg);
 }
 
@@ -133,8 +133,7 @@ async function enviarLembrete(destinatario, demanda, tipoLembrete, solicitante =
     `─────────────────\n` +
     `*Responda com:*\n` +
     `*3* — Marcar como concluído\n` +
-    `*2* — Propor novo prazo` +
-    MENU_COMPLETO;
+    `*2* — Propor novo prazo`;
 
   const mensagens = {
     antes_vencimento_3:
@@ -161,8 +160,7 @@ async function enviarLembrete(destinatario, demanda, tipoLembrete, solicitante =
       `"${demanda.descricao}" foi concluída.\n\n` +
       `─────────────────\n` +
       `*Responda com:*\n` +
-      `*4* — Confirmar e dar baixa` +
-      MENU_COMPLETO,
+      `*4* — Confirmar e dar baixa`,
   };
 
   await enviarMensagem(destinatario, mensagens[tipoLembrete] || `Lembrete: "${demanda.descricao}"`);
@@ -196,7 +194,6 @@ async function enviarRelatorioDiario(usuario, { vencidas, vencem_hoje, vencem_em
     }
   }
 
-  msg += MENU_COMPLETO;
   await enviarMensagem(usuario, msg);
 }
 
