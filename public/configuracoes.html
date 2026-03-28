@@ -6,38 +6,50 @@
   <title>Configurações — Gestão de Demandas</title>
   <link rel="stylesheet" href="/css/style.css" />
   <style>
-    .nav-tabs { display: flex; gap: 4px; padding: 0 24px; background: var(--green-dark); }
-    .nav-tab { padding: 10px 20px; color: rgba(255,255,255,.7); font-size: .9rem; font-weight: 500; cursor: pointer; border-bottom: 3px solid transparent; text-decoration: none; }
-    .nav-tab:hover { color: #fff; }
-    .nav-tab.active { color: #fff; border-bottom-color: #fff; }
+    /* Override nav-tabs for configuracoes page — inherits from style.css but needs the active tab to point to Configurações */
+    .nav-tabs { display: flex; gap: 4px; padding: 0 24px; background: var(--surface); border-bottom: 1px solid var(--border); }
+    .nav-tab { padding: 10px 20px; color: var(--text-muted); font-size: .9rem; font-weight: 500; cursor: pointer; border-bottom: 3px solid transparent; text-decoration: none; transition: color .15s; }
+    .nav-tab:hover { color: var(--text); }
+    .nav-tab.active { color: var(--text); border-bottom-color: var(--accent); font-weight: 600; }
+
     .config-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
     @media (max-width: 700px) { .config-grid { grid-template-columns: 1fr; } }
-    .config-card { background: var(--card); border-radius: var(--radius); padding: 24px; box-shadow: var(--shadow); }
-    .config-card h2 { font-size: 1rem; font-weight: 700; color: var(--green-dark); margin-bottom: 18px; display: flex; align-items: center; gap: 8px; }
+
+    .config-card { background: var(--surface); border-radius: var(--radius); padding: 24px; border: 1px solid var(--border); box-shadow: 0 2px 8px rgba(0,0,0,.3); }
+    .config-card h2 { font-size: 1rem; font-weight: 700; color: var(--accent); margin-bottom: 18px; display: flex; align-items: center; gap: 8px; }
+
     .config-row { display: flex; align-items: center; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid var(--border); }
     .config-row:last-child { border-bottom: none; padding-bottom: 0; }
-    .config-label { font-size: .9rem; }
-    .config-label small { display: block; color: var(--muted); font-size: .75rem; margin-top: 2px; }
+    .config-label { font-size: .9rem; color: var(--text); }
+    .config-label small { display: block; color: var(--text-muted); font-size: .75rem; margin-top: 2px; }
+
     /* Toggle switch */
     .toggle { position: relative; width: 44px; height: 24px; flex-shrink: 0; }
     .toggle input { opacity: 0; width: 0; height: 0; }
-    .toggle-slider { position: absolute; inset: 0; background: #ccc; border-radius: 24px; cursor: pointer; transition: .2s; }
-    .toggle-slider::before { content: ''; position: absolute; width: 18px; height: 18px; left: 3px; bottom: 3px; background: white; border-radius: 50%; transition: .2s; }
-    .toggle input:checked + .toggle-slider { background: var(--green); }
-    .toggle input:checked + .toggle-slider::before { transform: translateX(20px); }
+    .toggle-slider { position: absolute; inset: 0; background: var(--surface-3); border: 1px solid var(--border); border-radius: 24px; cursor: pointer; transition: .2s; }
+    .toggle-slider::before { content: ''; position: absolute; width: 18px; height: 18px; left: 3px; bottom: 2px; background: var(--text-muted); border-radius: 50%; transition: .2s; }
+    .toggle input:checked + .toggle-slider { background: var(--accent); border-color: var(--accent); }
+    .toggle input:checked + .toggle-slider::before { transform: translateX(20px); background: #fff; }
+
     /* Number input */
-    .input-small { width: 64px; padding: 6px 8px; border: 1px solid var(--border); border-radius: 6px; font-size: .9rem; text-align: center; }
-    .input-time { width: 100px; padding: 8px 10px; border: 1px solid var(--border); border-radius: 6px; font-size: 1rem; }
+    .input-small { width: 64px; padding: 6px 8px; border: 1px solid var(--border); border-radius: 6px; font-size: .9rem; text-align: center; background: var(--surface-3); color: var(--text); font-family: inherit; }
+    .input-small:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-glow); }
+    .input-time { width: 100px; padding: 8px 10px; border: 1px solid var(--border); border-radius: 6px; font-size: 1rem; background: var(--surface-3); color: var(--text); font-family: inherit; }
+    .input-time:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-glow); }
+
     /* Botões */
-    .btn-salvar { width: 100%; padding: 12px; background: var(--green); color: #fff; border: none; border-radius: 8px; font-size: 1rem; font-weight: 700; cursor: pointer; margin-top: 20px; }
-    .btn-salvar:hover { background: var(--green-dark); }
-    .btn-teste { width: 100%; padding: 11px; background: #fff; color: var(--green-dark); border: 2px solid var(--green-dark); border-radius: 8px; font-size: .95rem; font-weight: 600; cursor: pointer; margin-top: 10px; }
-    .btn-teste:hover { background: var(--green-dark); color: #fff; }
+    .btn-salvar { width: 100%; padding: 12px; background: var(--accent); color: #fff; border: none; border-radius: 8px; font-size: 1rem; font-weight: 700; cursor: pointer; margin-top: 20px; font-family: inherit; transition: background .15s, box-shadow .15s; }
+    .btn-salvar:hover { background: var(--accent-hover); box-shadow: 0 0 0 3px var(--accent-glow); }
+    .btn-teste { width: 100%; padding: 11px; background: transparent; color: var(--accent); border: 1px solid var(--accent); border-radius: 8px; font-size: .95rem; font-weight: 600; cursor: pointer; margin-top: 10px; font-family: inherit; transition: background .15s, color .15s; }
+    .btn-teste:hover { background: var(--accent-glow); }
+    .btn-teste:disabled { opacity: .45; cursor: not-allowed; }
+
     .save-msg { text-align: center; font-size: .85rem; margin-top: 10px; min-height: 20px; }
-    .save-msg.ok  { color: var(--green-dark); }
-    .save-msg.err { color: #c0392b; }
-    .preview-card { background: #f9fafb; border: 1px solid var(--border); border-radius: 8px; padding: 16px; font-size: .82rem; white-space: pre-wrap; line-height: 1.6; color: #333; margin-top: 12px; }
-    .preview-card h3 { font-size: .78rem; text-transform: uppercase; color: var(--muted); margin-bottom: 8px; letter-spacing: .05em; }
+    .save-msg.ok  { color: var(--success); }
+    .save-msg.err { color: var(--danger); }
+
+    .preview-card { background: var(--surface-3); border: 1px solid var(--border); border-radius: 8px; padding: 16px; font-size: .82rem; white-space: pre-wrap; line-height: 1.6; color: var(--text); margin-top: 12px; }
+    .preview-card h3 { font-size: .78rem; text-transform: uppercase; color: var(--text-muted); margin-bottom: 8px; letter-spacing: .05em; }
   </style>
 </head>
 <body>
@@ -83,7 +95,7 @@
       <!-- Alertas de Prazo -->
       <div class="config-card">
         <h2>🔔 Alertas de Prazo</h2>
-        <p style="font-size:.82rem;color:var(--muted);margin-bottom:12px">Alertas enviados ao responsável pela tarefa</p>
+        <p style="font-size:.82rem;color:var(--text-muted);margin-bottom:12px">Alertas enviados ao responsável pela tarefa</p>
 
         <div class="config-row">
           <div class="config-label">
@@ -130,7 +142,7 @@
       <!-- Alertas de Baixa -->
       <div class="config-card">
         <h2>✅ Alertas de Confirmação</h2>
-        <p style="font-size:.82rem;color:var(--muted);margin-bottom:12px">Alertas enviados ao solicitante aguardando dar baixa</p>
+        <p style="font-size:.82rem;color:var(--text-muted);margin-bottom:12px">Alertas enviados ao solicitante aguardando dar baixa</p>
 
         <div class="config-row">
           <div class="config-label">
@@ -147,7 +159,7 @@
       <!-- Alertas de Demanda Sem Resposta -->
       <div class="config-card">
         <h2>⏰ Alerta de Sem Resposta</h2>
-        <p style="font-size:.82rem;color:var(--muted);margin-bottom:12px">Lembrete enviado ao responsável quando não aceita/recusa uma atividade</p>
+        <p style="font-size:.82rem;color:var(--text-muted);margin-bottom:12px">Lembrete enviado ao responsável quando não aceita/recusa uma atividade</p>
 
         <div class="config-row">
           <div class="config-label">
@@ -171,7 +183,7 @@
       <!-- Resumo / Salvar -->
       <div class="config-card">
         <h2>💾 Salvar Configurações</h2>
-        <p style="font-size:.85rem;color:var(--muted);line-height:1.6">
+        <p style="font-size:.85rem;color:var(--text-muted);line-height:1.6">
           As configurações se aplicam imediatamente. O horário do relatório diário é atualizado sem precisar reiniciar o servidor.
         </p>
         <button class="btn-salvar" id="btn-salvar">Salvar Configurações</button>
