@@ -135,6 +135,19 @@ async function continuarFluxo(usuario, texto, comando, parametros, sessao, telef
     case 'aguardando_justificativa_prazo': await fluxoJustificativaPrazo(usuario, texto, sessao, telefone, res); break;
     case 'impedimento_selecionar':        await fluxoImpedimentoSelecionar(usuario, texto, comando, parametros, sessao, telefone, res); break;
     case 'aguardando_impedimento':        await fluxoImpedimento(usuario, texto, sessao, telefone, res); break;
+    case 'aceitar_selecionar': {
+      if (texto === '0') {
+        clearSessao(telefone);
+        await whatsappService.enviarMensagem(usuario, '❌ Cancelado.');
+        return res.status(200).send('OK');
+      }
+      const idx = parseInt(texto) - 1;
+      if (isNaN(idx) || idx < 0 || idx >= sessao.pendentes.length) {
+        await whatsappService.enviarMensagem(usuario, `❓ Escolha um número da lista ou *0* para cancelar.`);
+        return res.status(200).send('OK');
+      }
+      return executarAceite(usuario, sessao.pendentes[idx], telefone, res, null);
+    }
     case 'baixa_selecionar': {
       if (texto === '0') {
         clearSessao(telefone);
@@ -524,24 +537,42 @@ async function handleStatus(usuario, res) {
 async function handleAceitar(usuario, telefone, res) {
   const db = getDb();
 
-  // Caso 1: usuário é RESPONSÁVEL aceitando demanda nova ou prazo proposto
-  let demanda = db.prepare(`
+  // Busca todas as demandas aguardando aceite deste usuário
+  const comoResponsavel = db.prepare(`
     SELECT * FROM demandas WHERE responsavel_id = ? AND status IN ('pendente_aceite','em_negociacao')
-    ORDER BY criado_em DESC LIMIT 1
-  `).get(usuario.id);
+    ORDER BY criado_em DESC
+  `).all(usuario.id);
 
-  // Caso 2: usuário é SOLICITANTE aceitando prazo proposto pelo responsável
-  if (!demanda) {
-    demanda = db.prepare(`
-      SELECT * FROM demandas WHERE solicitante_id = ? AND status = 'em_negociacao'
-      ORDER BY atualizado_em DESC LIMIT 1
-    `).get(usuario.id);
-  }
+  const comoSolicitante = db.prepare(`
+    SELECT * FROM demandas WHERE solicitante_id = ? AND status = 'em_negociacao'
+    ORDER BY atualizado_em DESC
+  `).all(usuario.id);
 
-  if (!demanda) {
+  const pendentes = [...comoResponsavel, ...comoSolicitante];
+
+  if (pendentes.length === 0) {
     await whatsappService.enviarMensagem(usuario, 'Nada aguardando seu aceite no momento.');
     return res.status(200).send('OK');
   }
+
+  // Se houver mais de uma, pede para selecionar
+  if (pendentes.length > 1) {
+    const lista = pendentes.map((d, i) => {
+      const tipo = d.responsavel_id === usuario.id ? 'recebida' : 'prazo proposto';
+      return `*${i + 1}* — ${d.descricao.substring(0, 45)} _(${tipo})_`;
+    }).join('\n');
+    setSessao(telefone, { fluxo: 'aceitar_selecionar', pendentes });
+    await whatsappService.enviarMensagem(usuario,
+      `📋 *Qual atividade deseja aceitar?*\n\n${lista}\n\n*0* — Cancelar`
+    );
+    return res.status(200).send('OK');
+  }
+
+  await executarAceite(usuario, pendentes[0], telefone, res, db);
+}
+
+async function executarAceite(usuario, demanda, telefone, res, db) {
+  if (!db) db = getDb();
 
   const dataAcordada = demanda.data_acordada || demanda.data_entrega;
   db.prepare(`UPDATE demandas SET status='aceita', data_acordada=?, atualizado_em=datetime('now') WHERE id=?`)
@@ -555,13 +586,19 @@ async function handleAceitar(usuario, telefone, res) {
   const outraParteId = ehResponsavel ? demanda.solicitante_id : demanda.responsavel_id;
   const outraParte = db.prepare('SELECT * FROM usuarios WHERE id=?').get(outraParteId);
 
-  if (ehResponsavel) {
-    await whatsappService.notificarAceite(outraParte, usuario, { ...demanda, data_acordada: dataAcordada });
-  } else {
-    await whatsappService.enviarMensagem(outraParte,
-      `✅ *Prazo aceito!*\n\n${usuario.nome} aceitou o prazo de *${formatarData(dataAcordada)}*\n` +
-      `"${demanda.descricao}"\n\n💬 Falar com ${usuario.nome.split(' ')[0]}: ${whatsappService.linkWhatsApp(usuario)}`
-    );
+  try {
+    if (outraParte) {
+      if (ehResponsavel) {
+        await whatsappService.notificarAceite(outraParte, usuario, { ...demanda, data_acordada: dataAcordada });
+      } else {
+        await whatsappService.enviarMensagem(outraParte,
+          `✅ *Prazo aceito!*\n\n${usuario.nome} aceitou o prazo de *${formatarData(dataAcordada)}*\n` +
+          `"${demanda.descricao}"\n\n💬 Falar com ${usuario.nome.split(' ')[0]}: ${whatsappService.linkWhatsApp(usuario)}`
+        );
+      }
+    }
+  } catch (err) {
+    console.error('[Aceitar] Erro ao notificar outra parte:', err.message);
   }
 
   // Pergunta sobre Google Calendar

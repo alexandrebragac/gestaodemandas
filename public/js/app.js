@@ -523,4 +523,9 @@ document.getElementById('modal').addEventListener('click', (e) => {
   await carregarUsuarios();
   await carregarDemandas();
   carregarProximoRelatorio();
+
+  // Auto-refresh a cada 30 segundos
+  setInterval(async () => {
+    await carregarDemandas();
+  }, 30_000);
 })();
