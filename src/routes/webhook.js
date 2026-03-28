@@ -71,7 +71,11 @@ router.post('/whatsapp', async (req, res) => {
 });
 
 // Fluxos que esperam texto livre ou data (não seleção de lista por número)
-const FLUXOS_TEXTO = new Set(['criar_descricao', 'criar_prazo', 'editar_nova_descricao', 'editar_novo_prazo', 'aguardando_data_prazo']);
+const FLUXOS_TEXTO = new Set([
+  'criar_descricao', 'criar_prazo',
+  'editar_nova_descricao', 'editar_novo_prazo',
+  'aguardando_data_prazo', 'aguardando_justificativa_prazo', 'aguardando_impedimento',
+]);
 
 // ── Google Calendar ───────────────────────────────────────────────────────────
 
@@ -115,7 +119,10 @@ async function continuarFluxo(usuario, texto, comando, parametros, sessao, telef
     case 'editar_campo':          await fluxoEditarCampo(usuario, texto, comando, parametros, sessao, telefone, res); break;
     case 'editar_nova_descricao': await fluxoEditarNovaDescricao(usuario, texto, sessao, telefone, res); break;
     case 'editar_novo_prazo':     await fluxoEditarNovoPrazo(usuario, texto, comando, parametros, sessao, telefone, res); break;
-    case 'aguardando_calendario': await fluxoCalendario(usuario, texto, sessao, telefone, res); break;
+    case 'aguardando_calendario':         await fluxoCalendario(usuario, texto, sessao, telefone, res); break;
+    case 'aguardando_justificativa_prazo': await fluxoJustificativaPrazo(usuario, texto, sessao, telefone, res); break;
+    case 'impedimento_selecionar':        await fluxoImpedimentoSelecionar(usuario, texto, comando, parametros, sessao, telefone, res); break;
+    case 'aguardando_impedimento':        await fluxoImpedimento(usuario, texto, sessao, telefone, res); break;
     case 'aguardando_data_prazo': {
       const dataExtraida = extrairData(texto, comando, parametros);
       if (!dataExtraida && texto !== '0') {
@@ -392,28 +399,27 @@ async function handleNumeroMenu(usuario, numero, sessao, telefone, res) {
     6: COMANDOS.AJUDA,
     7: COMANDOS.NOVA_DEMANDA,
     8: COMANDOS.EDITAR_DEMANDA,
+    9: 'impedimento',
   };
 
   const acao = mapa[numero];
 
   if (!acao) {
-    await whatsappService.enviarMensagem(usuario, `Opção *${numero}* inválida. Digite *6* para ver os comandos.`);
+    await whatsappService.enviarMensagem(usuario, `Opção *${numero}* não reconhecida.`);
     return res.status(200).send('OK');
   }
 
   if (acao === COMANDOS.AJUDA)          { await whatsappService.enviarMensagem(usuario, mensagemAjuda()); return res.status(200).send('OK'); }
-  if (acao === COMANDOS.STATUS)          { return handleStatus(usuario, res); }
-  if (acao === COMANDOS.ACEITAR)         { return handleAceitar(usuario, telefone, res); }
-  if (acao === COMANDOS.CONCLUIR)        { return handleConcluir(usuario, telefone, res); }
-  if (acao === COMANDOS.BAIXA)           { return handleBaixa(usuario, telefone, res); }
-  if (acao === COMANDOS.NOVA_DEMANDA)    { return iniciarCriacaoDemanda(usuario, telefone, res); }
-  if (acao === COMANDOS.EDITAR_DEMANDA)  { return iniciarEdicaoDemanda(usuario, telefone, res); }
+  if (acao === COMANDOS.STATUS)         { return handleStatus(usuario, res); }
+  if (acao === COMANDOS.ACEITAR)        { return handleAceitar(usuario, telefone, res); }
+  if (acao === COMANDOS.CONCLUIR)       { return handleConcluir(usuario, telefone, res); }
+  if (acao === COMANDOS.BAIXA)          { return handleBaixa(usuario, telefone, res); }
+  if (acao === COMANDOS.NOVA_DEMANDA)   { return iniciarCriacaoDemanda(usuario, telefone, res); }
+  if (acao === COMANDOS.EDITAR_DEMANDA) { return iniciarEdicaoDemanda(usuario, telefone, res); }
+  if (acao === 'impedimento')           { return iniciarImpedimento(usuario, telefone, res); }
 
   if (acao === 'pedir_prazo') {
-    const perguntaPrazoNovo = `📅 *Qual é o novo prazo?*\nResponda no formato *DD/MM/AAAA*\nEx: 15/04/2026\n\n*0* — Cancelar`;
-    setSessao(telefone, { fluxo: 'aguardando_data_prazo', demandaId: sessao?.demandaId || null, pergunta_atual: perguntaPrazoNovo });
-    await whatsappService.enviarMensagem(usuario, perguntaPrazoNovo);
-    return res.status(200).send('OK');
+    return iniciarNovoPrazo(usuario, sessao?.demandaId || null, telefone, res);
   }
 
   res.status(200).send('OK');
@@ -532,17 +538,19 @@ async function fluxoCalendario(usuario, texto, sessao, telefone, res) {
 
 async function handleNovoPrazoComData(usuario, demandaId, novaData, telefone, res) {
   const db = getDb();
+  const sessao = getSessao(telefone);
+  const justificativa = sessao?.justificativa || null;
 
   let demanda = demandaId ? db.prepare('SELECT * FROM demandas WHERE id=?').get(demandaId) : null;
   if (!demanda) {
-    demanda = db.prepare(`SELECT * FROM demandas WHERE responsavel_id=? AND status IN ('pendente_aceite','em_negociacao') ORDER BY criado_em DESC LIMIT 1`).get(usuario.id);
+    demanda = db.prepare(`SELECT * FROM demandas WHERE responsavel_id=? AND status IN ('pendente_aceite','em_negociacao','aceita','em_andamento') ORDER BY criado_em DESC LIMIT 1`).get(usuario.id);
   }
   if (!demanda) {
     demanda = db.prepare(`SELECT * FROM demandas WHERE solicitante_id=? AND status='em_negociacao' ORDER BY criado_em DESC LIMIT 1`).get(usuario.id);
   }
 
   if (!demanda || !novaData) {
-    await whatsappService.enviarMensagem(usuario, 'Nenhuma demanda em negociação encontrada.');
+    await whatsappService.enviarMensagem(usuario, '⚠️ Nenhuma atividade encontrada para alterar o prazo.');
     clearSessao(telefone);
     return res.status(200).send('OK');
   }
@@ -553,10 +561,8 @@ async function handleNovoPrazoComData(usuario, demandaId, novaData, telefone, re
   const ehResponsavel = demanda.responsavel_id === usuario.id;
   const outro = db.prepare('SELECT * FROM usuarios WHERE id=?').get(ehResponsavel ? demanda.solicitante_id : demanda.responsavel_id);
 
-  await whatsappService.enviarMensagem(outro,
-    `🔄 *Novo prazo proposto*\n\n${usuario.nome} propôs: *${formatarData(novaData)}*\nTarefa: "${demanda.descricao}"\n\n*1* — Aceitar\n*2* — Propor outro prazo`
-  );
-  await whatsappService.enviarMensagem(usuario, `📅 Novo prazo *${formatarData(novaData)}* proposto. Aguardando confirmação.`);
+  await whatsappService.notificarNovoPrazo(outro, usuario, { ...demanda, nova_data: novaData }, justificativa);
+  await whatsappService.enviarMensagem(usuario, `📅 Novo prazo *${formatarData(novaData)}* proposto${justificativa ? ' com justificativa' : ''}.\nAguardando confirmação de ${outro.nome.split(' ')[0]}.`);
   clearSessao(telefone);
   res.status(200).send('OK');
 }
@@ -597,6 +603,103 @@ async function handleBaixa(usuario, telefone, res) {
   await whatsappService.notificarBaixa(responsavel, usuario, demanda);
   await whatsappService.enviarMensagem(usuario, `✔️ Baixa confirmada!\n"${demanda.descricao}"\nDemanda finalizada!`);
   clearSessao(telefone);
+  res.status(200).send('OK');
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// FLUXO: NOVO PRAZO COM JUSTIFICATIVA
+// ══════════════════════════════════════════════════════════════════════════════
+
+async function iniciarNovoPrazo(usuario, demandaId, telefone, res) {
+  const pergunta = `📋 *Por que precisa de um novo prazo?*\n\n_Ex: imprevisto, reunião cancelada, aguardando aprovação_\n\n*0* — Cancelar`;
+  setSessao(telefone, { fluxo: 'aguardando_justificativa_prazo', demandaId, pergunta_atual: pergunta });
+  await whatsappService.enviarMensagem(usuario, pergunta);
+  res.status(200).send('OK');
+}
+
+async function fluxoJustificativaPrazo(usuario, texto, sessao, telefone, res) {
+  if (texto === '0') {
+    clearSessao(telefone);
+    await whatsappService.enviarMensagem(usuario, '❌ Cancelado.');
+    return res.status(200).send('OK');
+  }
+  const perguntaData = `📅 *Qual é o novo prazo?*\nFormato: *DD/MM/AAAA*\nEx: 30/04/2026\n\n*0* — Cancelar`;
+  setSessao(telefone, {
+    fluxo: 'aguardando_data_prazo',
+    demandaId: sessao.demandaId || null,
+    justificativa: texto.trim(),
+    pergunta_atual: perguntaData,
+  });
+  await whatsappService.enviarMensagem(usuario, perguntaData);
+  res.status(200).send('OK');
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// FLUXO: REPORTAR IMPEDIMENTO
+// ══════════════════════════════════════════════════════════════════════════════
+
+async function iniciarImpedimento(usuario, telefone, res) {
+  const db = getDb();
+  const demandas = db.prepare(`
+    SELECT * FROM demandas
+    WHERE responsavel_id = ? AND status IN ('pendente_aceite','aceita','em_andamento')
+    ORDER BY data_esperada ASC
+  `).all(usuario.id);
+
+  if (demandas.length === 0) {
+    await whatsappService.enviarMensagem(usuario, '⚠️ Você não tem atividades ativas para reportar impedimento.');
+    return res.status(200).send('OK');
+  }
+
+  if (demandas.length === 1) {
+    const d = demandas[0];
+    const pergunta = `🚧 *Reportar Impedimento*\n\n"${d.descricao}"\n\nDescreva o que está bloqueando:\n\n_Ex: aguardando cliente, falta de acesso, dependência externa_\n\n*0* — Cancelar`;
+    setSessao(telefone, { fluxo: 'aguardando_impedimento', demanda: d, pergunta_atual: pergunta });
+    await whatsappService.enviarMensagem(usuario, pergunta);
+    return res.status(200).send('OK');
+  }
+
+  setSessao(telefone, { fluxo: 'impedimento_selecionar', demandas });
+  let msg = `🚧 *Reportar Impedimento*\n\nQual atividade está bloqueada?\n\n`;
+  demandas.forEach((d, i) => {
+    msg += `*${i + 1}* — ${d.descricao.substring(0, 50)}\n`;
+  });
+  msg += `\n*0* — Cancelar`;
+  await whatsappService.enviarMensagem(usuario, msg);
+  res.status(200).send('OK');
+}
+
+async function fluxoImpedimentoSelecionar(usuario, texto, comando, parametros, sessao, telefone, res) {
+  if (texto === '0') {
+    clearSessao(telefone);
+    await whatsappService.enviarMensagem(usuario, '❌ Cancelado.');
+    return res.status(200).send('OK');
+  }
+  const demanda = comando === COMANDOS.NUMERO_MENU ? sessao.demandas[parametros.numero - 1] : null;
+  if (!demanda) {
+    await whatsappService.enviarMensagem(usuario, '⚠️ Opção inválida. Digite o número da atividade ou *0* para cancelar.');
+    return res.status(200).send('OK');
+  }
+  const pergunta = `🚧 *"${demanda.descricao.substring(0, 50)}"*\n\nDescreva o que está bloqueando:\n\n*0* — Cancelar`;
+  setSessao(telefone, { fluxo: 'aguardando_impedimento', demanda, pergunta_atual: pergunta });
+  await whatsappService.enviarMensagem(usuario, pergunta);
+  res.status(200).send('OK');
+}
+
+async function fluxoImpedimento(usuario, texto, sessao, telefone, res) {
+  if (texto === '0') {
+    clearSessao(telefone);
+    await whatsappService.enviarMensagem(usuario, '❌ Cancelado.');
+    return res.status(200).send('OK');
+  }
+  const db = getDb();
+  const demanda = sessao.demanda;
+  const solicitante = db.prepare('SELECT * FROM usuarios WHERE id=?').get(demanda.solicitante_id);
+  await whatsappService.notificarImpedimento(solicitante, usuario, demanda, texto.trim());
+  clearSessao(telefone);
+  await whatsappService.enviarMensagem(usuario,
+    `🚧 *Impedimento registrado!*\n\n"${demanda.descricao}"\n\n${solicitante.nome} foi notificado(a).`
+  );
   res.status(200).send('OK');
 }
 

@@ -1,4 +1,5 @@
 require('dotenv').config();
+const getDb = require('../database/db');
 
 let twilioClient = null;
 
@@ -19,33 +20,84 @@ function formatPhone(telefone) {
   return `whatsapp:+${numero}`;
 }
 
-// Gera link wa.me para abrir conversa com o usuário
 function linkWhatsApp(usuario) {
   const numero = usuario.telefone_whatsapp.replace(/\D/g, '');
   return `https://wa.me/${numero}`;
 }
 
-// Menu completo de opções (substitui "ajuda")
-const MENU_COMPLETO =
-  `\n─────────────────\n` +
-  `*O que posso fazer:*\n` +
-  `*1* — Aceitar demanda/prazo\n` +
-  `*2* — Propor novo prazo\n` +
-  `*3* — Marcar como concluído\n` +
-  `*4* — Dar baixa (confirmar conclusão)\n` +
-  `*5* — Ver minhas demandas\n` +
-  `*7* — Criar nova demanda\n` +
-  `*8* — Editar demanda`;
+// ── Menu dinâmico contextual ──────────────────────────────────────────────────
+// Exibe apenas as ações relevantes para o estado atual das demandas do usuário.
+
+function gerarMenuContextual(usuario) {
+  if (!usuario || !usuario.id) return '';
+  try {
+    const db = getDb();
+    const demandas = db.prepare(`
+      SELECT status, responsavel_id, solicitante_id
+      FROM demandas
+      WHERE (responsavel_id = ? OR solicitante_id = ?)
+        AND status NOT IN ('finalizada')
+    `).all(usuario.id, usuario.id);
+
+    const asResp = d => d.responsavel_id === usuario.id;
+    const asSol  = d => d.solicitante_id === usuario.id;
+
+    const pendenteAceite = demandas.filter(d => asResp(d) && d.status === 'pendente_aceite').length;
+    const emAtividade    = demandas.filter(d => asResp(d) && ['aceita', 'em_andamento'].includes(d.status)).length;
+    const negResp        = demandas.filter(d => asResp(d) && d.status === 'em_negociacao').length;
+    const negSol         = demandas.filter(d => asSol(d) && d.status === 'em_negociacao').length;
+    const aguardaBaixa   = demandas.filter(d => asSol(d) && d.status === 'concluida_aguardando_baixa').length;
+
+    const linhas = [];
+
+    // Aceitar (responsável com pendente ou negociação, ou solicitante com negociação)
+    if (pendenteAceite > 0 || negResp > 0 || negSol > 0) {
+      const cnt = pendenteAceite + negSol;
+      linhas.push(`*1* — Aceitar${cnt > 0 ? ` _(${cnt} aguardando)_` : ''}`);
+    }
+
+    // Solicitar novo prazo (responsável com demandas ativas)
+    if (pendenteAceite > 0 || emAtividade > 0 || negResp > 0) {
+      linhas.push(`*2* — Solicitar novo prazo`);
+    }
+
+    // Concluir (responsável com demandas aceitas/em andamento)
+    if (emAtividade > 0) {
+      linhas.push(`*3* — Concluir atividade`);
+    }
+
+    // Confirmar conclusão (solicitante aguardando baixa)
+    if (aguardaBaixa > 0) {
+      linhas.push(`*4* — Confirmar conclusão _(${aguardaBaixa} aguardando)_`);
+    }
+
+    // Reportar impedimento (responsável com atividades ativas)
+    if (pendenteAceite > 0 || emAtividade > 0) {
+      linhas.push(`*9* — Reportar impedimento`);
+    }
+
+    // Sempre disponíveis
+    linhas.push(`*5* — Ver minhas atividades`);
+    linhas.push(`*7* — Criar nova atividade`);
+    linhas.push(`*8* — Editar atividade`);
+
+    return `\n─────────────────\n${linhas.join('\n')}`;
+  } catch (e) {
+    console.error('[WhatsApp] Erro ao gerar menu:', e.message);
+    return `\n─────────────────\n*5* — Ver atividades  *7* — Criar  *8* — Editar`;
+  }
+}
+
+// ── Envio de mensagem ─────────────────────────────────────────────────────────
 
 async function enviarMensagem(destinatario, mensagem) {
   const from = process.env.TWILIO_WHATSAPP_NUMBER || 'whatsapp:+14155238886';
   const to = formatPhone(destinatario.telefone_whatsapp);
   const client = getClient();
 
-  // Sempre exibe o menu completo no final, evitando duplicatas
-  const corpo = mensagem.includes('*O que posso fazer:*')
-    ? mensagem
-    : mensagem + MENU_COMPLETO;
+  // Anexa menu dinâmico se a mensagem não tiver seção de ações própria
+  const menu = mensagem.includes('─────────────────') ? '' : gerarMenuContextual(destinatario);
+  const corpo = mensagem + menu;
 
   if (!client) {
     console.log(`[WhatsApp SIMULADO] Para: ${to}\n${corpo}\n${'─'.repeat(50)}`);
@@ -64,7 +116,7 @@ async function enviarMensagem(destinatario, mensagem) {
 
 async function notificarNovaDeamanda(responsavel, solicitante, demanda) {
   const msg =
-    `📋 *Nova Demanda Recebida*\n\n` +
+    `📋 *Nova Atividade Recebida*\n\n` +
     `De: ${solicitante.nome}\n` +
     `Tarefa: ${demanda.descricao}\n` +
     `Prazo: ${formatarData(demanda.data_esperada)}\n\n` +
@@ -72,13 +124,14 @@ async function notificarNovaDeamanda(responsavel, solicitante, demanda) {
     `─────────────────\n` +
     `*Responda com:*\n` +
     `*1* — Aceitar\n` +
-    `*2* — Propor novo prazo`;
+    `*2* — Solicitar novo prazo (com motivo)\n` +
+    `*9* — Reportar impedimento`;
   await enviarMensagem(responsavel, msg);
 }
 
 async function notificarAceite(solicitante, responsavel, demanda) {
   const msg =
-    `✅ *Demanda Aceita!*\n\n` +
+    `✅ *Atividade Aceita!*\n\n` +
     `${responsavel.nome} aceitou:\n` +
     `"${demanda.descricao}"\n` +
     `Prazo acordado: ${formatarData(demanda.data_acordada)}\n\n` +
@@ -86,24 +139,23 @@ async function notificarAceite(solicitante, responsavel, demanda) {
   await enviarMensagem(solicitante, msg);
 }
 
-async function notificarNovoPrazo(solicitante, responsavel, demanda) {
+async function notificarNovoPrazo(solicitante, responsavel, demanda, justificativa) {
+  const motivo = justificativa ? `\nMotivo: _${justificativa}_` : '';
   const msg =
-    `🔄 *Novo Prazo Proposto*\n\n` +
-    `${responsavel.nome} sugeriu:\n` +
-    `"${demanda.descricao}"\n` +
-    `Novo prazo: *${formatarData(demanda.nova_data)}*` +
-    (demanda.observacao ? `\nObs: ${demanda.observacao}` : '') + `\n\n` +
+    `🔄 *Novo Prazo Solicitado*\n\n` +
+    `${responsavel.nome} propôs: *${formatarData(demanda.nova_data)}*\n` +
+    `Tarefa: "${demanda.descricao}"${motivo}\n\n` +
     `💬 Falar com ${responsavel.nome.split(' ')[0]}: ${linkWhatsApp(responsavel)}\n` +
     `─────────────────\n` +
     `*Responda com:*\n` +
-    `*1* — Aceitar o novo prazo\n` +
+    `*1* — Aceitar novo prazo\n` +
     `*2* — Propor outro prazo`;
   await enviarMensagem(solicitante, msg);
 }
 
 async function notificarConclusao(solicitante, responsavel, demanda) {
   const msg =
-    `🎉 *Tarefa Concluída!*\n\n` +
+    `🎉 *Atividade Concluída!*\n\n` +
     `${responsavel.nome} concluiu:\n` +
     `"${demanda.descricao}"\n\n` +
     `💬 Falar com ${responsavel.nome.split(' ')[0]}: ${linkWhatsApp(responsavel)}\n` +
@@ -118,8 +170,22 @@ async function notificarBaixa(responsavel, solicitante, demanda) {
     `✔️ *Baixa Confirmada!*\n\n` +
     `${solicitante.nome} confirmou a conclusão de:\n` +
     `"${demanda.descricao}"\n\n` +
-    `Demanda finalizada com sucesso!`;
+    `Atividade finalizada com sucesso! 🎯`;
   await enviarMensagem(responsavel, msg);
+}
+
+async function notificarImpedimento(solicitante, responsavel, demanda, descricao) {
+  const msg =
+    `🚧 *Impedimento Reportado*\n\n` +
+    `${responsavel.nome} reportou um bloqueio em:\n` +
+    `"${demanda.descricao}"\n\n` +
+    `Motivo: _${descricao}_\n\n` +
+    `💬 Falar com ${responsavel.nome.split(' ')[0]}: ${linkWhatsApp(responsavel)}\n` +
+    `─────────────────\n` +
+    `*O que fazer:*\n` +
+    `*2* — Propor novo prazo\n` +
+    `*7* — Criar nova atividade`;
+  await enviarMensagem(solicitante, msg);
 }
 
 async function enviarLembrete(destinatario, demanda, tipoLembrete, solicitante = null) {
@@ -132,8 +198,9 @@ async function enviarLembrete(destinatario, demanda, tipoLembrete, solicitante =
   const opcoesPrazo =
     `─────────────────\n` +
     `*Responda com:*\n` +
-    `*3* — Marcar como concluído\n` +
-    `*2* — Propor novo prazo`;
+    `*3* — Concluir atividade\n` +
+    `*2* — Solicitar novo prazo\n` +
+    `*9* — Reportar impedimento`;
 
   const mensagens = {
     antes_vencimento_3:
@@ -161,6 +228,16 @@ async function enviarLembrete(destinatario, demanda, tipoLembrete, solicitante =
       `─────────────────\n` +
       `*Responda com:*\n` +
       `*4* — Confirmar e dar baixa`,
+
+    pendente_aceite:
+      `⏰ *Atividade aguardando sua resposta*\n\n` +
+      `"${demanda.descricao}"\n` +
+      `Prazo: ${prazo}${linkSolicitante}\n\n` +
+      `─────────────────\n` +
+      `*Responda com:*\n` +
+      `*1* — Aceitar\n` +
+      `*2* — Solicitar novo prazo\n` +
+      `*9* — Reportar impedimento`,
   };
 
   await enviarMensagem(destinatario, mensagens[tipoLembrete] || `Lembrete: "${demanda.descricao}"`);
@@ -173,9 +250,9 @@ async function enviarRelatorioDiario(usuario, { vencidas, vencem_hoje, vencem_em
   let msg = `📊 *Relatório Diário — ${hoje}*\n\nOlá, ${usuario.nome.split(' ')[0]}!\n\n`;
 
   if (total_ativas === 0) {
-    msg += `✅ Nenhuma demanda ativa. Ótimo trabalho!`;
+    msg += `✅ Nenhuma atividade ativa. Ótimo trabalho!`;
   } else {
-    msg += `Você tem *${total_ativas}* demanda(s) ativa(s):\n\n`;
+    msg += `Você tem *${total_ativas}* atividade(s) ativa(s):\n\n`;
 
     if (vencidas.length > 0) {
       msg += `🔴 *Vencidas (${vencidas.length}):*\n`;
@@ -197,7 +274,7 @@ async function enviarRelatorioDiario(usuario, { vencidas, vencem_hoje, vencem_em
   await enviarMensagem(usuario, msg);
 }
 
-// ── Utilitário ────────────────────────────────────────────────────────────────
+// ── Utilitários ───────────────────────────────────────────────────────────────
 
 function formatarData(iso) {
   if (!iso) return '—';
@@ -212,6 +289,7 @@ module.exports = {
   notificarNovoPrazo,
   notificarConclusao,
   notificarBaixa,
+  notificarImpedimento,
   enviarLembrete,
   enviarRelatorioDiario,
   linkWhatsApp,

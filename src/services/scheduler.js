@@ -14,6 +14,14 @@ function iniciarScheduler() {
   console.log('[Scheduler] Iniciando jobs...');
   agendarJobRelatorio();
 
+  // Job horário: alerta para demandas pendentes sem resposta
+  cron.schedule('0 * * * *', async () => {
+    const cfg = getConfig();
+    if (cfg.alerta_pendente_sem_resposta === '1') {
+      await verificarPendentesNaoRespondidos();
+    }
+  });
+
   if (process.env.NODE_ENV !== 'production') {
     setTimeout(async () => {
       console.log('[Scheduler] Verificação inicial de lembretes (dev)...');
@@ -163,4 +171,39 @@ async function enviarLembrete(lembrete, db) {
   }
 }
 
-module.exports = { iniciarScheduler, reconfigurarScheduler, processarLembretes, enviarRelatoriosDiarios };
+// ── Alertas horários: demandas pendentes sem resposta ────────────────────────
+
+async function verificarPendentesNaoRespondidos() {
+  const db = getDb();
+  const cfg = getConfig();
+  const intervaloHoras = parseInt(cfg.intervalo_alerta_pendente_horas || '1');
+
+  const limite = new Date();
+  limite.setHours(limite.getHours() - intervaloHoras);
+  const limiteISO = limite.toISOString();
+
+  const pendentes = db.prepare(`
+    SELECT d.*,
+           u.id AS resp_id, u.nome AS resp_nome, u.telefone_whatsapp AS resp_tel
+    FROM demandas d
+    JOIN usuarios u ON u.id = d.responsavel_id
+    WHERE d.status = 'pendente_aceite' AND d.criado_em <= ?
+  `).all(limiteISO);
+
+  if (pendentes.length > 0) {
+    console.log(`[Scheduler] ${pendentes.length} demanda(s) pendente(s) sem resposta há ${intervaloHoras}h+`);
+  }
+
+  for (const d of pendentes) {
+    const responsavel = { id: d.resp_id, nome: d.resp_nome, telefone_whatsapp: d.resp_tel };
+    const solicitante = db.prepare('SELECT * FROM usuarios WHERE id = ?').get(d.solicitante_id);
+    const demanda = { id: d.id, descricao: d.descricao, data_esperada: d.data_esperada, data_acordada: d.data_acordada, status: d.status };
+    try {
+      await whatsappService.enviarLembrete(responsavel, demanda, 'pendente_aceite', solicitante);
+    } catch (err) {
+      console.error(`[Scheduler] Erro ao enviar alerta pendente ${d.id}:`, err.message);
+    }
+  }
+}
+
+module.exports = { iniciarScheduler, reconfigurarScheduler, processarLembretes, enviarRelatoriosDiarios, verificarPendentesNaoRespondidos };
