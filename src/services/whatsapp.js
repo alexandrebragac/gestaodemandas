@@ -26,10 +26,14 @@ function linkWhatsApp(usuario) {
 }
 
 // ── Menu dinâmico contextual ──────────────────────────────────────────────────
-// Exibe apenas as ações relevantes para o estado atual das demandas do usuário.
+// Cache simples: evita query repetida no mesmo segundo
+const _menuCache = new Map(); // userId → { menu, ts }
+const MENU_TTL = 5000; // 5 segundos
 
 function gerarMenuContextual(usuario) {
   if (!usuario || !usuario.id) return '';
+  const cached = _menuCache.get(usuario.id);
+  if (cached && Date.now() - cached.ts < MENU_TTL) return cached.menu;
   try {
     const db = getDb();
     const demandas = db.prepare(`
@@ -81,7 +85,9 @@ function gerarMenuContextual(usuario) {
     linhas.push(`*7* — Criar nova atividade`);
     linhas.push(`*8* — Editar atividade`);
 
-    return `\n─────────────────\n${linhas.join('\n')}`;
+    const menu = `\n─────────────────\n${linhas.join('\n')}`;
+    _menuCache.set(usuario.id, { menu, ts: Date.now() });
+    return menu;
   } catch (e) {
     console.error('[WhatsApp] Erro ao gerar menu:', e.message);
     return `\n─────────────────\n*5* — Ver atividades  *7* — Criar  *8* — Editar`;

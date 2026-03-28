@@ -56,22 +56,27 @@ async function responderPergunta(usuario, pergunta) {
     `DEMANDAS ONDE SOU RESPONSÁVEL:\n${listar(comoResponsavel, 'solicitante')}\n\n` +
     `DEMANDAS QUE EU SOLICITEI:\n${listar(comoSolicitante, 'responsavel')}`;
 
-  const response = await client.messages.create({
-    model: 'claude-haiku-4-5-20251001',
-    max_tokens: 400,
-    system:
-      'Você é um assistente de gestão de tarefas integrado ao WhatsApp. ' +
-      'Responda perguntas sobre as demandas do usuário de forma direta e concisa. ' +
-      'Use *asteriscos* para negrito (formato WhatsApp). ' +
-      'Não repita todo o contexto, apenas responda o que foi perguntado. ' +
-      'Máximo 250 palavras.',
-    messages: [
-      {
-        role: 'user',
-        content: `Contexto das minhas demandas:\n${contexto}\n\nPergunta: ${pergunta}`,
-      },
-    ],
-  });
+  const timeout = new Promise((_, reject) =>
+    setTimeout(() => reject(new Error('IA timeout')), 8000)
+  );
+
+  const response = await Promise.race([
+    client.messages.create({
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: 250,
+      system:
+        'Você é um assistente de gestão de tarefas integrado ao WhatsApp. ' +
+        'Responda de forma direta e concisa. Use *asteriscos* para negrito. ' +
+        'Máximo 150 palavras. Não repita o contexto.',
+      messages: [
+        {
+          role: 'user',
+          content: `Contexto das minhas demandas:\n${contexto}\n\nPergunta: ${pergunta}`,
+        },
+      ],
+    }),
+    timeout,
+  ]);
 
   return response.content[0].text;
 }
