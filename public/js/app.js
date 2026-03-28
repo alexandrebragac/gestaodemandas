@@ -94,7 +94,93 @@ async function carregarDemandas() {
     demandas = demandas.filter(d => d.status !== 'finalizada');
   }
   renderDemandas();
+  renderUsuariosOverview();
   atualizarStats();
+}
+
+// ── Render: Visão por Usuário ────────────────────────────────────────────────
+
+function renderUsuariosOverview() {
+  const container = document.getElementById('usuarios-overview');
+  if (!container || usuarios.length === 0) return;
+
+  const hoje = new Date().toISOString().slice(0, 10);
+  const STATUSES_ATIVAS = ['pendente_aceite', 'em_negociacao', 'aceita', 'em_andamento', 'concluida_aguardando_baixa'];
+
+  // Compute per-user stats from current demandas in memory
+  const stats = usuarios.map(u => {
+    // As responsável: count by status from active demands
+    const comoResp = demandas.filter(d => d.responsavel_id === u.id && STATUSES_ATIVAS.includes(d.status));
+    const vencidas = comoResp.filter(d => {
+      const prazo = d.data_acordada || d.data_entrega;
+      return prazo && prazo < hoje;
+    }).length;
+    const pendenteAceite = comoResp.filter(d => d.status === 'pendente_aceite').length;
+    const emAndamento = comoResp.filter(d => ['aceita', 'em_andamento', 'em_negociacao'].includes(d.status)).length;
+
+    // As solicitante: aguardando_baixa
+    const aguardandoBaixa = demandas.filter(d =>
+      d.solicitante_id === u.id && d.status === 'concluida_aguardando_baixa'
+    ).length;
+
+    // Determine border color: red > orange > green > gray
+    let borderClass = 'border-gray';
+    if (vencidas > 0) borderClass = 'border-red';
+    else if (pendenteAceite > 0) borderClass = 'border-orange';
+    else if (emAndamento > 0 || aguardandoBaixa > 0) borderClass = 'border-green';
+
+    return { u, vencidas, pendenteAceite, emAndamento, aguardandoBaixa, borderClass };
+  });
+
+  // Only show users with at least one active demand
+  const ativos = stats.filter(s =>
+    s.vencidas > 0 || s.pendenteAceite > 0 || s.emAndamento > 0 || s.aguardandoBaixa > 0
+  );
+
+  if (ativos.length === 0) {
+    container.innerHTML = '';
+    return;
+  }
+
+  // Sort: red first, then orange, green, gray
+  const order = { 'border-red': 0, 'border-orange': 1, 'border-green': 2, 'border-gray': 3 };
+  ativos.sort((a, b) => order[a.borderClass] - order[b.borderClass]);
+
+  const cards = ativos.map(s => `
+    <div class="usuario-ov-card ${s.borderClass}">
+      <div class="usuario-ov-header">
+        <div class="usuario-ov-avatar">${iniciais(s.u.nome)}</div>
+        <div class="usuario-ov-nome" title="${s.u.nome}">${s.u.nome}</div>
+      </div>
+      <div class="ov-section-label">Como responsável</div>
+      <div class="ov-stats-row">
+        <div class="ov-stat red">
+          <span class="ov-stat-num">${s.vencidas}</span>
+          <span class="ov-stat-label">Vencidas</span>
+        </div>
+        <div class="ov-stat yellow">
+          <span class="ov-stat-num">${s.pendenteAceite}</span>
+          <span class="ov-stat-label">Pend. Aceite</span>
+        </div>
+        <div class="ov-stat green">
+          <span class="ov-stat-num">${s.emAndamento}</span>
+          <span class="ov-stat-label">Em Andamento</span>
+        </div>
+      </div>
+      <div class="ov-section-label">Como solicitante</div>
+      <div class="ov-stats-row">
+        <div class="ov-stat purple">
+          <span class="ov-stat-num">${s.aguardandoBaixa}</span>
+          <span class="ov-stat-label">Ag. Baixa</span>
+        </div>
+      </div>
+    </div>
+  `).join('');
+
+  container.innerHTML = `
+    <div class="usuarios-overview-header">Visão por Usuário</div>
+    <div class="usuario-overview-grid">${cards}</div>
+  `;
 }
 
 // ── Render: Usuários ─────────────────────────────────────────────────────────
@@ -195,10 +281,16 @@ async function atualizarStats() {
   try {
     const todas = await api('/api/demandas');
     const ativas = todas.filter(d => d.status !== 'finalizada');
+    const hoje = new Date().toISOString().slice(0, 10);
+    const vencidas = ativas.filter(d => {
+      const prazo = d.data_acordada || d.data_entrega;
+      return prazo && prazo < hoje;
+    }).length;
     document.getElementById('total-demandas').textContent = ativas.length;
     document.getElementById('pendentes').textContent = ativas.filter(d => d.status === 'pendente_aceite').length;
     document.getElementById('em-andamento').textContent = ativas.filter(d => ['aceita', 'em_andamento'].includes(d.status)).length;
     document.getElementById('aguardando-baixa').textContent = ativas.filter(d => d.status === 'concluida_aguardando_baixa').length;
+    document.getElementById('vencidas').textContent = vencidas;
   } catch (e) { /* silencioso */ }
 }
 
@@ -390,6 +482,37 @@ document.getElementById('btn-refresh').addEventListener('click', async () => {
   await carregarDemandas();
 });
 
+document.getElementById('btn-enviar-relatorio').addEventListener('click', async () => {
+  const btn = document.getElementById('btn-enviar-relatorio');
+  btn.disabled = true;
+  btn.textContent = '⏳ Enviando...';
+  try {
+    await api('/api/configuracoes/testar-relatorio', { method: 'POST', body: {} });
+    btn.textContent = '✅ Enviado!';
+    setTimeout(() => {
+      btn.textContent = '📨 Enviar Relatório Agora';
+      btn.disabled = false;
+    }, 3000);
+  } catch (e) {
+    btn.textContent = '❌ Erro: ' + e.message;
+    setTimeout(() => {
+      btn.textContent = '📨 Enviar Relatório Agora';
+      btn.disabled = false;
+    }, 4000);
+  }
+});
+
+async function carregarProximoRelatorio() {
+  try {
+    const config = await api('/api/configuracoes');
+    const horario = config?.horario_relatorio;
+    if (!horario) return;
+    const badge = document.getElementById('proximo-relatorio');
+    badge.textContent = `Próximo relatório: ${horario}`;
+    badge.classList.add('visible');
+  } catch (e) { /* silencioso */ }
+}
+
 document.getElementById('modal-close').addEventListener('click', fecharModal);
 document.getElementById('modal').addEventListener('click', (e) => {
   if (e.target === e.currentTarget) fecharModal();
@@ -400,4 +523,5 @@ document.getElementById('modal').addEventListener('click', (e) => {
 (async () => {
   await carregarUsuarios();
   await carregarDemandas();
+  carregarProximoRelatorio();
 })();

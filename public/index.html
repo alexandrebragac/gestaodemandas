@@ -26,7 +26,11 @@
       <div class="stat-card"><span id="pendentes">—</span><label>Aguardando Aceite</label></div>
       <div class="stat-card"><span id="em-andamento">—</span><label>Em Andamento</label></div>
       <div class="stat-card"><span id="aguardando-baixa">—</span><label>Aguardando Baixa</label></div>
+      <div class="stat-card vencida"><span id="vencidas">—</span><label>Vencidas</label></div>
     </section>
+
+    <!-- Visão por Usuário -->
+    <section id="usuarios-overview" style="margin-bottom:20px"></section>
 
     <div class="layout">
       <!-- Painel esquerdo: formulário + usuários -->
@@ -84,6 +88,8 @@
             </select>
           </label>
           <button class="btn-icon" id="btn-refresh" title="Atualizar">↻</button>
+          <button class="btn-enviar-relatorio" id="btn-enviar-relatorio" title="Enviar relatório agora">📨 Enviar Relatório Agora</button>
+          <span id="proximo-relatorio" class="proximo-relatorio-badge"></span>
         </div>
 
         <div id="lista-demandas"></div>
