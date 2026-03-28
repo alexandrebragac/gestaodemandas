@@ -102,11 +102,8 @@ async function continuarFluxo(usuario, texto, comando, parametros, sessao, telef
     texto !== '0' &&
     comando === COMANDOS.NUMERO_MENU
   ) {
-    const pergunta = sessao.pergunta_atual || 'Responda a pergunta acima.';
-    await whatsappService.enviarMensagem(
-      usuario,
-      `⚠️ *Ação em andamento!*\n\nVocê tem uma ação que precisa de resposta:\n\n${pergunta}\n\n_Digite *0* para cancelar._`
-    );
+    const pergunta = sessao.pergunta_atual || '';
+    await whatsappService.enviarMensagem(usuario, `⏳ ${pergunta}\n\n_*0* para cancelar_`);
     return res.status(200).send('OK');
   }
 
@@ -126,10 +123,7 @@ async function continuarFluxo(usuario, texto, comando, parametros, sessao, telef
     case 'aguardando_data_prazo': {
       const dataExtraida = extrairData(texto, comando, parametros);
       if (!dataExtraida && texto !== '0') {
-        await whatsappService.enviarMensagem(usuario,
-          `❓ Data inválida. Use *DD/MM/AAAA*\nEx: 15/04/2026\n\n` +
-          `📅 *Qual é o novo prazo?*\n_Digite a data ou *0* para cancelar._`
-        );
+        await whatsappService.enviarMensagem(usuario, `❓ Use *DD/MM/AAAA* — ex: 30/04/2026`);
         return res.status(200).send('OK');
       }
       await handleNovoPrazoComData(usuario, sessao.demandaId, dataExtraida, telefone, res);
@@ -137,7 +131,7 @@ async function continuarFluxo(usuario, texto, comando, parametros, sessao, telef
     }
     default:
       clearSessao(telefone);
-      await whatsappService.enviarMensagem(usuario, 'Sessão expirada. Use os comandos abaixo.');
+      await whatsappService.enviarMensagem(usuario, 'Sessão expirada.');
       res.status(200).send('OK');
   }
   } catch (err) {
@@ -210,10 +204,7 @@ async function fluxoCriarPrazo(usuario, texto, comando, parametros, sessao, tele
 
   const data = extrairData(texto, comando, parametros);
   if (!data) {
-    await whatsappService.enviarMensagem(usuario,
-      `❓ Data inválida. Use o formato *DD/MM/AAAA*\nEx: 30/04/2026\n\n` +
-      `📅 *Qual é o prazo?*\n_Digite a data ou *0* para cancelar._`
-    );
+    await whatsappService.enviarMensagem(usuario, `❓ Use *DD/MM/AAAA* — ex: 30/04/2026`);
     return res.status(200).send('OK');
   }
 
@@ -304,7 +295,7 @@ async function fluxoEditarSelecionar(usuario, texto, comando, parametros, sessao
   }
 
   if (!demanda) {
-    await whatsappService.enviarMensagem(usuario, `⚠️ Opção inválida. Digite o número da demanda.`);
+    await whatsappService.enviarMensagem(usuario, `⚠️ Número inválido. Tente novamente.`);
     return res.status(200).send('OK');
   }
 
@@ -405,7 +396,7 @@ async function handleNumeroMenu(usuario, numero, sessao, telefone, res) {
   const acao = mapa[numero];
 
   if (!acao) {
-    await whatsappService.enviarMensagem(usuario, `Opção *${numero}* não reconhecida.`);
+    await whatsappService.enviarMensagem(usuario, `Opção inválida.`);
     return res.status(200).send('OK');
   }
 
@@ -483,7 +474,7 @@ async function handleAceitar(usuario, telefone, res) {
   }
 
   if (!demanda) {
-    await whatsappService.enviarMensagem(usuario, '⚠️ Nenhuma demanda aguardando seu aceite no momento.');
+    await whatsappService.enviarMensagem(usuario, 'Nada aguardando seu aceite no momento.');
     return res.status(200).send('OK');
   }
 
@@ -531,7 +522,7 @@ async function fluxoCalendario(usuario, texto, sessao, telefone, res) {
       `📅 *Adicionar ao Google Agenda:*\n\n${link}\n\n_Clique no link para abrir e salvar o evento._`
     );
   } else {
-    await whatsappService.enviarMensagem(usuario, `👍 Ok! A demanda foi aceita.`);
+    await whatsappService.enviarMensagem(usuario, `👍 Ok!`);
   }
   res.status(200).send('OK');
 }
@@ -550,7 +541,7 @@ async function handleNovoPrazoComData(usuario, demandaId, novaData, telefone, re
   }
 
   if (!demanda || !novaData) {
-    await whatsappService.enviarMensagem(usuario, '⚠️ Nenhuma atividade encontrada para alterar o prazo.');
+    await whatsappService.enviarMensagem(usuario, 'Nenhuma atividade encontrada para alterar prazo.');
     clearSessao(telefone);
     return res.status(200).send('OK');
   }
@@ -572,7 +563,7 @@ async function handleConcluir(usuario, telefone, res) {
   const demanda = db.prepare(`SELECT * FROM demandas WHERE responsavel_id=? AND status IN ('aceita','em_andamento') ORDER BY data_esperada ASC LIMIT 1`).get(usuario.id);
 
   if (!demanda) {
-    await whatsappService.enviarMensagem(usuario, 'Nenhuma demanda em andamento encontrada.');
+    await whatsappService.enviarMensagem(usuario, 'Nenhuma atividade em andamento.');
     return res.status(200).send('OK');
   }
 
@@ -582,7 +573,7 @@ async function handleConcluir(usuario, telefone, res) {
 
   const solicitante = db.prepare('SELECT * FROM usuarios WHERE id=?').get(demanda.solicitante_id);
   await whatsappService.notificarConclusao(solicitante, usuario, demanda);
-  await whatsappService.enviarMensagem(usuario, `✅ Marcado como concluído!\n"${demanda.descricao}"\nAguardando confirmação do solicitante.`);
+  await whatsappService.enviarMensagem(usuario, `✅ Concluído! Aguardando confirmação de ${solicitante.nome.split(' ')[0]}.`);
   clearSessao(telefone);
   res.status(200).send('OK');
 }
@@ -592,7 +583,7 @@ async function handleBaixa(usuario, telefone, res) {
   const demanda = db.prepare(`SELECT * FROM demandas WHERE solicitante_id=? AND status='concluida_aguardando_baixa' ORDER BY atualizado_em DESC LIMIT 1`).get(usuario.id);
 
   if (!demanda) {
-    await whatsappService.enviarMensagem(usuario, 'Nenhuma demanda aguardando sua confirmação.');
+    await whatsappService.enviarMensagem(usuario, 'Nada aguardando sua confirmação.');
     return res.status(200).send('OK');
   }
 
@@ -601,7 +592,7 @@ async function handleBaixa(usuario, telefone, res) {
 
   const responsavel = db.prepare('SELECT * FROM usuarios WHERE id=?').get(demanda.responsavel_id);
   await whatsappService.notificarBaixa(responsavel, usuario, demanda);
-  await whatsappService.enviarMensagem(usuario, `✔️ Baixa confirmada!\n"${demanda.descricao}"\nDemanda finalizada!`);
+  await whatsappService.enviarMensagem(usuario, `✔️ Baixa confirmada! Atividade finalizada.`);
   clearSessao(telefone);
   res.status(200).send('OK');
 }
@@ -706,24 +697,25 @@ async function fluxoImpedimento(usuario, texto, sessao, telefone, res) {
 // ── Assistente IA ─────────────────────────────────────────────────────────────
 
 async function handlePerguntaIA(usuario, texto, res) {
-  // Entradas muito curtas ou que parecem comandos não reconhecidos
-  if (texto.length <= 3) {
-    await whatsappService.enviarMensagem(usuario, `Não entendi "*${texto}*". Digite *6* para ver os comandos ou faça uma pergunta sobre suas atividades.`);
+  // Texto curto (saudações, comandos desconhecidos) → só mostra o menu
+  if (texto.length <= 5) {
+    await whatsappService.enviarMensagem(usuario, `Olá, ${usuario.nome.split(' ')[0]}! 👋`);
     return res.status(200).send('OK');
   }
 
+  // Sem chave de IA configurada → menu sem mensagem de erro
   if (!process.env.ANTHROPIC_API_KEY) {
-    await whatsappService.enviarMensagem(usuario, `Não entendi. Digite *6* para ver os comandos.`);
+    await whatsappService.enviarMensagem(usuario, `Use os comandos abaixo para gerenciar suas atividades.`);
     return res.status(200).send('OK');
   }
 
+  // Pergunta longa → responde com IA diretamente, sem mensagem preliminar
   try {
-    await whatsappService.enviarMensagem(usuario, `🤖 Consultando IA...`);
     const resposta = await iaService.responderPergunta(usuario, texto);
-    await whatsappService.enviarMensagem(usuario, `🤖 *Assistente IA*\n\n${resposta}`);
+    await whatsappService.enviarMensagem(usuario, resposta);
   } catch (e) {
     console.error('[IA] Erro:', e.message);
-    await whatsappService.enviarMensagem(usuario, `Não consegui processar sua pergunta. Tente novamente ou use os comandos numéricos.`);
+    await whatsappService.enviarMensagem(usuario, `Não consegui responder agora. Tente novamente.`);
   }
   res.status(200).send('OK');
 }
