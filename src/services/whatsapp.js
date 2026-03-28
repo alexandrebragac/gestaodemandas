@@ -15,7 +15,6 @@ function getClient() {
 }
 
 function formatPhone(telefone) {
-  // Garante formato whatsapp:+5511999...
   const numero = telefone.replace(/\D/g, '');
   return `whatsapp:+${numero}`;
 }
@@ -38,54 +37,56 @@ async function enviarMensagem(destinatario, mensagem) {
   }
 }
 
+// ── Notificações ─────────────────────────────────────────────────────────────
+
 async function notificarNovaDeamanda(responsavel, solicitante, demanda) {
   const msg =
     `📋 *Nova Demanda Recebida*\n\n` +
-    `Solicitante: ${solicitante.nome}\n` +
-    `Descrição: ${demanda.descricao}\n` +
-    `Prazo esperado: ${demanda.data_esperada}\n\n` +
+    `De: ${solicitante.nome}\n` +
+    `Tarefa: ${demanda.descricao}\n` +
+    `Prazo: ${formatarData(demanda.data_esperada)}\n\n` +
     `Responda com:\n` +
-    `• *aceito* — aceitar com o prazo proposto\n` +
-    `• *novo prazo: DD/MM/AAAA* — sugerir outro prazo\n` +
-    `• *ajuda* — ver todos os comandos`;
+    `*1* — Aceitar\n` +
+    `*2* — Propor novo prazo\n` +
+    `*6* — Ajuda`;
   await enviarMensagem(responsavel, msg);
 }
 
 async function notificarAceite(solicitante, responsavel, demanda) {
   const msg =
-    `✅ *Demanda Aceita*\n\n` +
-    `${responsavel.nome} aceitou sua demanda:\n` +
+    `✅ *Demanda Aceita!*\n\n` +
+    `${responsavel.nome} aceitou:\n` +
     `"${demanda.descricao}"\n\n` +
-    `Prazo acordado: ${demanda.data_acordada}`;
+    `Prazo acordado: ${formatarData(demanda.data_acordada)}`;
   await enviarMensagem(solicitante, msg);
 }
 
 async function notificarNovoPrazo(solicitante, responsavel, demanda) {
   const msg =
     `🔄 *Novo Prazo Proposto*\n\n` +
-    `${responsavel.nome} sugeriu um novo prazo para:\n` +
+    `${responsavel.nome} sugeriu novo prazo para:\n` +
     `"${demanda.descricao}"\n\n` +
-    `Novo prazo: ${demanda.nova_data}` +
+    `Novo prazo: ${formatarData(demanda.nova_data)}` +
     (demanda.observacao ? `\nObs: ${demanda.observacao}` : '') +
     `\n\nResponda com:\n` +
-    `• *aceito* — aceitar o novo prazo\n` +
-    `• *novo prazo: DD/MM/AAAA* — contra-propor`;
+    `*1* — Aceitar o novo prazo\n` +
+    `*2* — Propor outro prazo`;
   await enviarMensagem(solicitante, msg);
 }
 
 async function notificarConclusao(solicitante, responsavel, demanda) {
   const msg =
-    `🎉 *Demanda Concluída*\n\n` +
-    `${responsavel.nome} marcou como concluída:\n` +
+    `🎉 *Tarefa Concluída!*\n\n` +
+    `${responsavel.nome} concluiu:\n` +
     `"${demanda.descricao}"\n\n` +
-    `Para finalizar, responda com:\n` +
-    `• *baixa* ou *confirmo* — confirmar conclusão`;
+    `Responda com:\n` +
+    `*1* — Confirmar e dar baixa`;
   await enviarMensagem(solicitante, msg);
 }
 
 async function notificarBaixa(responsavel, solicitante, demanda) {
   const msg =
-    `✔️ *Baixa Confirmada*\n\n` +
+    `✔️ *Baixa Confirmada!*\n\n` +
     `${solicitante.nome} confirmou a conclusão de:\n` +
     `"${demanda.descricao}"\n\n` +
     `Demanda finalizada com sucesso!`;
@@ -93,16 +94,88 @@ async function notificarBaixa(responsavel, solicitante, demanda) {
 }
 
 async function enviarLembrete(destinatario, demanda, tipoLembrete) {
+  const prazo = formatarData(demanda.data_acordada || demanda.data_esperada);
   const mensagens = {
-    antes_vencimento_3: `⏰ *Lembrete: 3 dias para o prazo*\n\n"${demanda.descricao}"\nPrazo: ${demanda.data_acordada || demanda.data_esperada}\n\nResponda *status* para ver suas demandas.`,
-    antes_vencimento_1: `⚠️ *Lembrete: 1 dia para o prazo*\n\n"${demanda.descricao}"\nPrazo: ${demanda.data_acordada || demanda.data_esperada}\n\nResponda *concluído* quando finalizar.`,
-    no_vencimento: `🔴 *HOJE é o prazo!*\n\n"${demanda.descricao}"\n\nResponda *concluído* quando finalizar ou *novo prazo: DD/MM/AAAA* para renegociar.`,
-    apos_vencimento: `❗ *Prazo vencido*\n\n"${demanda.descricao}"\nPrazo era: ${demanda.data_acordada || demanda.data_esperada}\n\nResponda *concluído* quando finalizar.`,
-    aguardando_baixa: `⏳ *Aguardando sua confirmação*\n\n"${demanda.descricao}" foi marcada como concluída.\n\nResponda *baixa* ou *confirmo* para finalizar.`,
+    antes_vencimento_3:
+      `⏰ *Lembrete: 3 dias para o prazo*\n\n` +
+      `"${demanda.descricao}"\n` +
+      `Prazo: ${prazo}\n\n` +
+      `*3* — Marcar como concluído\n` +
+      `*2* — Propor novo prazo`,
+    antes_vencimento_1:
+      `⚠️ *Atenção: amanhã é o prazo!*\n\n` +
+      `"${demanda.descricao}"\n` +
+      `Prazo: ${prazo}\n\n` +
+      `*3* — Marcar como concluído\n` +
+      `*2* — Propor novo prazo`,
+    no_vencimento:
+      `🔴 *HOJE é o prazo!*\n\n` +
+      `"${demanda.descricao}"\n\n` +
+      `*3* — Marcar como concluído\n` +
+      `*2* — Propor novo prazo`,
+    apos_vencimento:
+      `❗ *Prazo vencido!*\n\n` +
+      `"${demanda.descricao}"\n` +
+      `Prazo era: ${prazo}\n\n` +
+      `*3* — Marcar como concluído\n` +
+      `*2* — Propor novo prazo`,
+    aguardando_baixa:
+      `⏳ *Aguardando sua confirmação*\n\n` +
+      `"${demanda.descricao}" foi concluída.\n\n` +
+      `*1* — Confirmar e dar baixa`,
   };
 
   const msg = mensagens[tipoLembrete] || `Lembrete sobre: "${demanda.descricao}"`;
   await enviarMensagem(destinatario, msg);
+}
+
+// ── Relatório diário ─────────────────────────────────────────────────────────
+
+async function enviarRelatorioDiario(usuario, { vencidas, vencem_hoje, vencem_em_3_dias, total_ativas }) {
+  const hoje = formatarData(new Date().toISOString().slice(0, 10));
+  let msg = `📊 *Relatório Diário — ${hoje}*\n\nOlá, ${usuario.nome.split(' ')[0]}!\n\n`;
+
+  if (total_ativas === 0) {
+    msg += `✅ Nenhuma demanda ativa no momento. Ótimo trabalho!`;
+  } else {
+    msg += `Você tem *${total_ativas}* demanda(s) ativa(s):\n\n`;
+
+    if (vencidas.length > 0) {
+      msg += `🔴 *Vencidas (${vencidas.length}):*\n`;
+      for (const d of vencidas) {
+        msg += `• ${d.descricao.substring(0, 40)} — ${formatarData(d.data_acordada || d.data_esperada)}\n`;
+      }
+      msg += '\n';
+    }
+
+    if (vencem_hoje.length > 0) {
+      msg += `🟡 *Vencem hoje (${vencem_hoje.length}):*\n`;
+      for (const d of vencem_hoje) {
+        msg += `• ${d.descricao.substring(0, 40)}\n`;
+      }
+      msg += '\n';
+    }
+
+    if (vencem_em_3_dias.length > 0) {
+      msg += `🟠 *Vencem em até 3 dias (${vencem_em_3_dias.length}):*\n`;
+      for (const d of vencem_em_3_dias) {
+        msg += `• ${d.descricao.substring(0, 40)} — ${formatarData(d.data_acordada || d.data_esperada)}\n`;
+      }
+      msg += '\n';
+    }
+
+    msg += `Digite *5* para ver todas as demandas.`;
+  }
+
+  await enviarMensagem(usuario, msg);
+}
+
+// ── Utilitário ───────────────────────────────────────────────────────────────
+
+function formatarData(iso) {
+  if (!iso) return '—';
+  const [y, m, d] = iso.slice(0, 10).split('-');
+  return `${d}/${m}/${y}`;
 }
 
 module.exports = {
@@ -113,4 +186,5 @@ module.exports = {
   notificarConclusao,
   notificarBaixa,
   enviarLembrete,
+  enviarRelatorioDiario,
 };
