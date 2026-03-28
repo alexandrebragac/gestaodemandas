@@ -71,7 +71,7 @@ router.post('/whatsapp', async (req, res) => {
 });
 
 // Fluxos que esperam texto livre ou data (não seleção de lista por número)
-const FLUXOS_TEXTO = new Set(['criar_prazo', 'editar_nova_descricao', 'editar_novo_prazo', 'aguardando_data_prazo']);
+const FLUXOS_TEXTO = new Set(['criar_descricao', 'criar_prazo', 'editar_nova_descricao', 'editar_novo_prazo', 'aguardando_data_prazo']);
 
 // ── Google Calendar ───────────────────────────────────────────────────────────
 
@@ -146,10 +146,9 @@ async function continuarFluxo(usuario, texto, comando, parametros, sessao, telef
 // ══════════════════════════════════════════════════════════════════════════════
 
 async function iniciarCriacaoDemanda(usuario, telefone, res) {
-  setSessao(telefone, { fluxo: 'criar_descricao' });
-  await whatsappService.enviarMensagem(usuario,
-    `📝 *Criar Nova Demanda*\n\nQual é a descrição da tarefa?\n\n_Digite o texto ou *0* para cancelar_`
-  );
+  const pergunta = `📝 *Criar Nova Demanda*\n\nQual é a descrição da tarefa?\n\n_Digite o texto da tarefa ou *0* para cancelar_`;
+  setSessao(telefone, { fluxo: 'criar_descricao', pergunta_atual: pergunta });
+  await whatsappService.enviarMensagem(usuario, pergunta);
   res.status(200).send('OK');
 }
 
@@ -318,10 +317,9 @@ async function fluxoEditarCampo(usuario, texto, comando, parametros, sessao, tel
   const num = comando === COMANDOS.NUMERO_MENU ? parametros.numero : parseInt(texto);
 
   if (num === 1) {
-    setSessao(telefone, { ...sessao, fluxo: 'editar_nova_descricao' });
-    await whatsappService.enviarMensagem(usuario,
-      `📝 Digite a nova descrição:\n\n_Atual: ${sessao.demanda.descricao}_\n\n*0* — Cancelar`
-    );
+    const perguntaDesc = `📝 *Nova descrição:*\n\n_Atual: ${sessao.demanda.descricao}_\n\n_Digite o novo texto ou *0* para cancelar_`;
+    setSessao(telefone, { ...sessao, fluxo: 'editar_nova_descricao', pergunta_atual: perguntaDesc });
+    await whatsappService.enviarMensagem(usuario, perguntaDesc);
   } else if (num === 2) {
     const prazoAtual = formatarData(sessao.demanda.data_acordada || sessao.demanda.data_esperada);
     const perguntaNovoPrazo = `📅 *Novo prazo* (*DD/MM/AAAA*):\n\n_Atual: ${prazoAtual}_\n\n*0* — Cancelar`;
