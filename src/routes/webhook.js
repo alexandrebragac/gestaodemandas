@@ -134,6 +134,19 @@ async function continuarFluxo(usuario, texto, comando, parametros, sessao, telef
     case 'aguardando_justificativa_prazo': await fluxoJustificativaPrazo(usuario, texto, sessao, telefone, res); break;
     case 'impedimento_selecionar':        await fluxoImpedimentoSelecionar(usuario, texto, comando, parametros, sessao, telefone, res); break;
     case 'aguardando_impedimento':        await fluxoImpedimento(usuario, texto, sessao, telefone, res); break;
+    case 'baixa_selecionar': {
+      if (texto === '0') {
+        clearSessao(telefone);
+        await whatsappService.enviarMensagem(usuario, '❌ Cancelado.');
+        return res.status(200).send('OK');
+      }
+      const idx = parseInt(texto) - 1;
+      if (isNaN(idx) || idx < 0 || idx >= sessao.pendentes.length) {
+        await whatsappService.enviarMensagem(usuario, `❓ Escolha um número da lista ou *0* para cancelar.`);
+        return res.status(200).send('OK');
+      }
+      return confirmarBaixa(usuario, sessao.pendentes[idx], telefone, res, null);
+    }
     case 'aguardando_data_prazo': {
       const dataExtraida = extrairData(texto, comando, parametros);
       if (!dataExtraida && texto !== '0') {
@@ -619,18 +632,36 @@ async function handleConcluir(usuario, telefone, res) {
 
 async function handleBaixa(usuario, telefone, res) {
   const db = getDb();
-  const demanda = db.prepare(`SELECT * FROM demandas WHERE solicitante_id=? AND status='concluida_aguardando_baixa' ORDER BY atualizado_em DESC LIMIT 1`).get(usuario.id);
+  const pendentes = db.prepare(`SELECT * FROM demandas WHERE solicitante_id=? AND status='concluida_aguardando_baixa' ORDER BY atualizado_em DESC`).all(usuario.id);
 
-  if (!demanda) {
+  if (pendentes.length === 0) {
     await whatsappService.enviarMensagem(usuario, 'Nada aguardando sua confirmação.');
     return res.status(200).send('OK');
   }
 
+  // Se houver mais de uma, pede para selecionar
+  if (pendentes.length > 1) {
+    const lista = pendentes.map((d, i) => `*${i + 1}* — ${d.descricao.substring(0, 50)}`).join('\n');
+    setSessao(telefone, { fluxo: 'baixa_selecionar', pendentes });
+    await whatsappService.enviarMensagem(usuario,
+      `📋 *Qual atividade deseja confirmar?*\n\n${lista}\n\n*0* — Cancelar`
+    );
+    return res.status(200).send('OK');
+  }
+
+  const demanda = pendentes[0];
+  await confirmarBaixa(usuario, demanda, telefone, res, db);
+}
+
+async function confirmarBaixa(usuario, demanda, telefone, res, db) {
+  if (!db) db = getDb();
   db.prepare(`UPDATE demandas SET status='finalizada', atualizado_em=datetime('now') WHERE id=?`).run(demanda.id);
   db.prepare('DELETE FROM lembretes WHERE demanda_id=? AND enviado=0').run(demanda.id);
 
   const responsavel = db.prepare('SELECT * FROM usuarios WHERE id=?').get(demanda.responsavel_id);
-  await whatsappService.notificarBaixa(responsavel, usuario, demanda);
+  if (responsavel) {
+    try { await whatsappService.notificarBaixa(responsavel, usuario, demanda); } catch (_) {}
+  }
   await whatsappService.enviarMensagem(usuario, `✔️ Baixa confirmada! Atividade finalizada.`);
   clearSessao(telefone);
   res.status(200).send('OK');
