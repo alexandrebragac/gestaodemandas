@@ -41,7 +41,26 @@ db.exec(`
     agendado_para TEXT NOT NULL,
     enviado INTEGER NOT NULL DEFAULT 0
   );
+  CREATE TABLE IF NOT EXISTS configuracoes (
+    chave TEXT PRIMARY KEY,
+    valor TEXT NOT NULL,
+    atualizado_em TEXT NOT NULL DEFAULT (datetime('now'))
+  );
 `);
+
+// Insere configurações padrão se ainda não existirem
+const defaults = {
+  horario_relatorio: '08:00',
+  alerta_3_dias: '1',
+  alerta_1_dia: '1',
+  alerta_no_dia: '1',
+  alerta_apos_vencimento: '1',
+  frequencia_apos_vencimento: '1',
+  alerta_aguardando_baixa: '1',
+  frequencia_aguardando_baixa: '2',
+};
+const insertCfg = db.prepare('INSERT OR IGNORE INTO configuracoes (chave, valor) VALUES (?, ?)');
+for (const [chave, valor] of Object.entries(defaults)) insertCfg.run(chave, valor);
 
 const app = express();
 
@@ -55,6 +74,7 @@ app.use(express.static(path.join(__dirname, '..', 'public')));
 // API Routes
 app.use('/api/usuarios', require('./routes/usuarios'));
 app.use('/api/demandas', require('./routes/demandas'));
+app.use('/api/configuracoes', require('./routes/configuracoes'));
 app.use('/webhook', require('./routes/webhook'));
 
 // Health check

@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Configurações — Gestão de Demandas</title>
+  <link rel="stylesheet" href="/css/style.css" />
+  <style>
+    .nav-tabs { display: flex; gap: 4px; padding: 0 24px; background: var(--green-dark); }
+    .nav-tab { padding: 10px 20px; color: rgba(255,255,255,.7); font-size: .9rem; font-weight: 500; cursor: pointer; border-bottom: 3px solid transparent; text-decoration: none; }
+    .nav-tab:hover { color: #fff; }
+    .nav-tab.active { color: #fff; border-bottom-color: #fff; }
+    .config-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    @media (max-width: 700px) { .config-grid { grid-template-columns: 1fr; } }
+    .config-card { background: var(--card); border-radius: var(--radius); padding: 24px; box-shadow: var(--shadow); }
+    .config-card h2 { font-size: 1rem; font-weight: 700; color: var(--green-dark); margin-bottom: 18px; display: flex; align-items: center; gap: 8px; }
+    .config-row { display: flex; align-items: center; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid var(--border); }
+    .config-row:last-child { border-bottom: none; padding-bottom: 0; }
+    .config-label { font-size: .9rem; }
+    .config-label small { display: block; color: var(--muted); font-size: .75rem; margin-top: 2px; }
+    /* Toggle switch */
+    .toggle { position: relative; width: 44px; height: 24px; flex-shrink: 0; }
+    .toggle input { opacity: 0; width: 0; height: 0; }
+    .toggle-slider { position: absolute; inset: 0; background: #ccc; border-radius: 24px; cursor: pointer; transition: .2s; }
+    .toggle-slider::before { content: ''; position: absolute; width: 18px; height: 18px; left: 3px; bottom: 3px; background: white; border-radius: 50%; transition: .2s; }
+    .toggle input:checked + .toggle-slider { background: var(--green); }
+    .toggle input:checked + .toggle-slider::before { transform: translateX(20px); }
+    /* Number input */
+    .input-small { width: 64px; padding: 6px 8px; border: 1px solid var(--border); border-radius: 6px; font-size: .9rem; text-align: center; }
+    .input-time { width: 100px; padding: 8px 10px; border: 1px solid var(--border); border-radius: 6px; font-size: 1rem; }
+    /* Botões */
+    .btn-salvar { width: 100%; padding: 12px; background: var(--green); color: #fff; border: none; border-radius: 8px; font-size: 1rem; font-weight: 700; cursor: pointer; margin-top: 20px; }
+    .btn-salvar:hover { background: var(--green-dark); }
+    .btn-teste { width: 100%; padding: 11px; background: #fff; color: var(--green-dark); border: 2px solid var(--green-dark); border-radius: 8px; font-size: .95rem; font-weight: 600; cursor: pointer; margin-top: 10px; }
+    .btn-teste:hover { background: var(--green-dark); color: #fff; }
+    .save-msg { text-align: center; font-size: .85rem; margin-top: 10px; min-height: 20px; }
+    .save-msg.ok  { color: var(--green-dark); }
+    .save-msg.err { color: #c0392b; }
+    .preview-card { background: #f9fafb; border: 1px solid var(--border); border-radius: 8px; padding: 16px; font-size: .82rem; white-space: pre-wrap; line-height: 1.6; color: #333; margin-top: 12px; }
+    .preview-card h3 { font-size: .78rem; text-transform: uppercase; color: var(--muted); margin-bottom: 8px; letter-spacing: .05em; }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="header-inner">
+      <h1>📋 Gestão de Demandas</h1>
+      <span class="subtitle">via WhatsApp</span>
+    </div>
+  </header>
+
+  <nav class="nav-tabs">
+    <a href="/" class="nav-tab">Dashboard</a>
+    <a href="/configuracoes.html" class="nav-tab active">⚙️ Configurações</a>
+  </nav>
+
+  <main style="max-width:900px;margin:0 auto;padding:20px 16px">
+
+    <div class="config-grid">
+
+      <!-- Horário e Relatório -->
+      <div class="config-card">
+        <h2>🕗 Relatório Diário</h2>
+
+        <div class="config-row">
+          <div class="config-label">
+            Horário de envio
+            <small>Relatório enviado todos os dias neste horário</small>
+          </div>
+          <input type="time" id="horario_relatorio" class="input-time" value="08:00" />
+        </div>
+
+        <div class="preview-card">
+          <h3>Preview da mensagem</h3>
+          <span id="preview-relatorio">Carregando...</span>
+        </div>
+
+        <button class="btn-teste" id="btn-teste-relatorio">
+          ▶ Enviar relatório agora (teste)
+        </button>
+        <div id="teste-msg" class="save-msg"></div>
+      </div>
+
+      <!-- Alertas de Prazo -->
+      <div class="config-card">
+        <h2>🔔 Alertas de Prazo</h2>
+        <p style="font-size:.82rem;color:var(--muted);margin-bottom:12px">Alertas enviados ao responsável pela tarefa</p>
+
+        <div class="config-row">
+          <div class="config-label">
+            3 dias antes do vencimento
+          </div>
+          <label class="toggle">
+            <input type="checkbox" id="alerta_3_dias" />
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+
+        <div class="config-row">
+          <div class="config-label">
+            1 dia antes do vencimento
+          </div>
+          <label class="toggle">
+            <input type="checkbox" id="alerta_1_dia" />
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+
+        <div class="config-row">
+          <div class="config-label">
+            No dia do vencimento
+          </div>
+          <label class="toggle">
+            <input type="checkbox" id="alerta_no_dia" />
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+
+        <div class="config-row">
+          <div class="config-label">
+            Após vencimento
+            <small>Repetir a cada <input type="number" id="frequencia_apos_vencimento" class="input-small" min="1" max="30" value="1" /> dia(s)</small>
+          </div>
+          <label class="toggle">
+            <input type="checkbox" id="alerta_apos_vencimento" />
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+      </div>
+
+      <!-- Alertas de Baixa -->
+      <div class="config-card">
+        <h2>✅ Alertas de Confirmação</h2>
+        <p style="font-size:.82rem;color:var(--muted);margin-bottom:12px">Alertas enviados ao solicitante aguardando dar baixa</p>
+
+        <div class="config-row">
+          <div class="config-label">
+            Lembrete para dar baixa
+            <small>Repetir a cada <input type="number" id="frequencia_aguardando_baixa" class="input-small" min="1" max="30" value="2" /> dia(s)</small>
+          </div>
+          <label class="toggle">
+            <input type="checkbox" id="alerta_aguardando_baixa" />
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+      </div>
+
+      <!-- Resumo / Salvar -->
+      <div class="config-card">
+        <h2>💾 Salvar Configurações</h2>
+        <p style="font-size:.85rem;color:var(--muted);line-height:1.6">
+          As configurações se aplicam imediatamente. O horário do relatório diário é atualizado sem precisar reiniciar o servidor.
+        </p>
+        <button class="btn-salvar" id="btn-salvar">Salvar Configurações</button>
+        <div id="save-msg" class="save-msg"></div>
+      </div>
+
+    </div>
+  </main>
+
+  <script>
+    async function api(path, options = {}) {
+      const res = await fetch(path, {
+        headers: { 'Content-Type': 'application/json' },
+        ...options,
+        body: options.body ? JSON.stringify(options.body) : undefined,
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ erro: 'Erro' }));
+        throw new Error(err.erro || `HTTP ${res.status}`);
+      }
+      return res.json();
+    }
+
+    function showMsg(id, msg, type) {
+      const el = document.getElementById(id);
+      el.textContent = msg;
+      el.className = `save-msg ${type}`;
+      setTimeout(() => { el.textContent = ''; el.className = 'save-msg'; }, 4000);
+    }
+
+    async function carregarConfiguracoes() {
+      const cfg = await api('/api/configuracoes');
+      document.getElementById('horario_relatorio').value = cfg.horario_relatorio || '08:00';
+      document.getElementById('alerta_3_dias').checked = cfg.alerta_3_dias === '1';
+      document.getElementById('alerta_1_dia').checked = cfg.alerta_1_dia === '1';
+      document.getElementById('alerta_no_dia').checked = cfg.alerta_no_dia === '1';
+      document.getElementById('alerta_apos_vencimento').checked = cfg.alerta_apos_vencimento === '1';
+      document.getElementById('frequencia_apos_vencimento').value = cfg.frequencia_apos_vencimento || '1';
+      document.getElementById('alerta_aguardando_baixa').checked = cfg.alerta_aguardando_baixa === '1';
+      document.getElementById('frequencia_aguardando_baixa').value = cfg.frequencia_aguardando_baixa || '2';
+      atualizarPreview(cfg);
+    }
+
+    function atualizarPreview(cfg) {
+      const horario = cfg.horario_relatorio || '08:00';
+      const hoje = new Date().toLocaleDateString('pt-BR');
+      let txt = `📊 Relatório Diário — ${hoje}\n\nOlá, Alexandre!\n\nVocê tem 3 demanda(s) ativa(s):\n\n`;
+      txt += `🔴 Vencidas (1):\n• Revisar proposta — 25/03/2026\n\n`;
+      txt += `🟡 Vencem hoje (1):\n• Enviar relatório mensal\n\n`;
+      txt += `🟠 Vencem em até 3 dias (1):\n• Reunião com cliente — 30/03/2026\n\n`;
+      txt += `Digite 5 para ver todas as demandas.`;
+      txt += `\n\n⏰ Enviado automaticamente às ${horario}`;
+      document.getElementById('preview-relatorio').textContent = txt;
+    }
+
+    document.getElementById('horario_relatorio').addEventListener('change', (e) => {
+      atualizarPreview({ horario_relatorio: e.target.value });
+    });
+
+    document.getElementById('btn-salvar').addEventListener('click', async () => {
+      const body = {
+        horario_relatorio: document.getElementById('horario_relatorio').value,
+        alerta_3_dias: document.getElementById('alerta_3_dias').checked ? '1' : '0',
+        alerta_1_dia: document.getElementById('alerta_1_dia').checked ? '1' : '0',
+        alerta_no_dia: document.getElementById('alerta_no_dia').checked ? '1' : '0',
+        alerta_apos_vencimento: document.getElementById('alerta_apos_vencimento').checked ? '1' : '0',
+        frequencia_apos_vencimento: document.getElementById('frequencia_apos_vencimento').value,
+        alerta_aguardando_baixa: document.getElementById('alerta_aguardando_baixa').checked ? '1' : '0',
+        frequencia_aguardando_baixa: document.getElementById('frequencia_aguardando_baixa').value,
+      };
+      try {
+        await api('/api/configuracoes', { method: 'PUT', body });
+        showMsg('save-msg', '✅ Configurações salvas! Horário atualizado.', 'ok');
+        atualizarPreview(body);
+      } catch (e) {
+        showMsg('save-msg', '❌ ' + e.message, 'err');
+      }
+    });
+
+    document.getElementById('btn-teste-relatorio').addEventListener('click', async () => {
+      const btn = document.getElementById('btn-teste-relatorio');
+      btn.disabled = true;
+      btn.textContent = '⏳ Enviando...';
+      try {
+        const res = await api('/api/configuracoes/testar-relatorio', { method: 'POST' });
+        showMsg('teste-msg', '✅ ' + res.mensagem, 'ok');
+      } catch (e) {
+        showMsg('teste-msg', '❌ ' + e.message, 'err');
+      } finally {
+        btn.disabled = false;
+        btn.textContent = '▶ Enviar relatório agora (teste)';
+      }
+    });
+
+    carregarConfiguracoes();
+  </script>
+</body>
+</html>
