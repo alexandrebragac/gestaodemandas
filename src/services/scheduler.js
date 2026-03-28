@@ -20,7 +20,7 @@ function iniciarScheduler() {
     if (cfg.alerta_pendente_sem_resposta === '1') {
       await verificarPendentesNaoRespondidos();
     }
-  });
+  }, { timezone: 'America/Sao_Paulo' });
 
   if (process.env.NODE_ENV !== 'production') {
     setTimeout(async () => {
@@ -45,8 +45,15 @@ function agendarJobRelatorio() {
 
   jobRelatorio = cron.schedule(cronExpr, async () => {
     console.log(`[Scheduler] Executando relatório das ${horario}...`);
-    await enviarRelatoriosDiarios();
-    await processarLembretes();
+    try {
+      await enviarRelatoriosDiarios();
+      await processarLembretes();
+      // Registra timestamp do último relatório enviado
+      const db = getDb();
+      db.prepare(`UPDATE configuracoes SET valor = datetime('now'), atualizado_em = datetime('now') WHERE chave = 'ultimo_relatorio'`).run();
+    } catch (err) {
+      console.error('[Scheduler] Erro no relatório diário:', err.message);
+    }
   }, { timezone: 'America/Sao_Paulo' });
 }
 

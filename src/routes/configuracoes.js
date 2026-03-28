@@ -54,6 +54,8 @@ router.post('/testar-relatorio', async (req, res) => {
   try {
     console.log('[Configurações] Disparando relatório de teste...');
     await enviarRelatoriosDiarios();
+    const db = getDb();
+    db.prepare(`UPDATE configuracoes SET valor = datetime('now'), atualizado_em = datetime('now') WHERE chave = 'ultimo_relatorio'`).run();
     res.json({ ok: true, mensagem: 'Relatório enviado com sucesso!' });
   } catch (err) {
     res.status(500).json({ erro: err.message });

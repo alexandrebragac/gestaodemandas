@@ -65,6 +65,7 @@ const defaults = {
   frequencia_aguardando_baixa: '2',
   alerta_pendente_sem_resposta: '0',
   intervalo_alerta_pendente_horas: '1',
+  ultimo_relatorio: '',
 };
 const insertCfg = db.prepare('INSERT OR IGNORE INTO configuracoes (chave, valor) VALUES (?, ?)');
 for (const [chave, valor] of Object.entries(defaults)) insertCfg.run(chave, valor);
