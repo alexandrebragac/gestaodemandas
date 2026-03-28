@@ -67,6 +67,20 @@ router.post('/whatsapp', async (req, res) => {
 // Fluxos que esperam texto livre ou data (não seleção de lista por número)
 const FLUXOS_TEXTO = new Set(['criar_prazo', 'editar_nova_descricao', 'editar_novo_prazo', 'aguardando_data_prazo']);
 
+// ── Google Calendar ───────────────────────────────────────────────────────────
+
+function gerarLinkCalendario(descricao, dataIso) {
+  const inicio = dataIso.replace(/-/g, '');
+  const fim = (() => {
+    const d = new Date(dataIso + 'T12:00:00Z');
+    d.setUTCDate(d.getUTCDate() + 1);
+    return d.toISOString().slice(0, 10).replace(/-/g, '');
+  })();
+  const titulo = encodeURIComponent(descricao.substring(0, 80));
+  const detalhes = encodeURIComponent('Prazo de atividade — Gestão de Demandas');
+  return `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${titulo}&dates=${inicio}/${fim}&details=${detalhes}`;
+}
+
 // ── Roteador de fluxos ativos ─────────────────────────────────────────────────
 
 async function continuarFluxo(usuario, texto, comando, parametros, sessao, telefone, res) {
@@ -94,6 +108,7 @@ async function continuarFluxo(usuario, texto, comando, parametros, sessao, telef
     case 'editar_campo':          await fluxoEditarCampo(usuario, texto, comando, parametros, sessao, telefone, res); break;
     case 'editar_nova_descricao': await fluxoEditarNovaDescricao(usuario, texto, sessao, telefone, res); break;
     case 'editar_novo_prazo':     await fluxoEditarNovoPrazo(usuario, texto, comando, parametros, sessao, telefone, res); break;
+    case 'aguardando_calendario': await fluxoCalendario(usuario, texto, sessao, telefone, res); break;
     case 'aguardando_data_prazo': {
       const dataExtraida = extrairData(texto, comando, parametros);
       if (!dataExtraida && texto !== '0') {
@@ -435,13 +450,23 @@ async function handleStatus(usuario, res) {
 
 async function handleAceitar(usuario, telefone, res) {
   const db = getDb();
-  const demanda = db.prepare(`
+
+  // Caso 1: usuário é RESPONSÁVEL aceitando demanda nova ou prazo proposto
+  let demanda = db.prepare(`
     SELECT * FROM demandas WHERE responsavel_id = ? AND status IN ('pendente_aceite','em_negociacao')
     ORDER BY criado_em DESC LIMIT 1
   `).get(usuario.id);
 
+  // Caso 2: usuário é SOLICITANTE aceitando prazo proposto pelo responsável
   if (!demanda) {
-    await whatsappService.enviarMensagem(usuario, 'Nenhuma demanda pendente de aceite.');
+    demanda = db.prepare(`
+      SELECT * FROM demandas WHERE solicitante_id = ? AND status = 'em_negociacao'
+      ORDER BY atualizado_em DESC LIMIT 1
+    `).get(usuario.id);
+  }
+
+  if (!demanda) {
+    await whatsappService.enviarMensagem(usuario, '⚠️ Nenhuma demanda aguardando seu aceite no momento.');
     return res.status(200).send('OK');
   }
 
@@ -452,10 +477,45 @@ async function handleAceitar(usuario, telefone, res) {
   db.prepare('DELETE FROM lembretes WHERE demanda_id=? AND enviado=0').run(demanda.id);
   lembreteService.agendarLembretes(demanda.id, dataAcordada);
 
-  const solicitante = db.prepare('SELECT * FROM usuarios WHERE id=?').get(demanda.solicitante_id);
-  await whatsappService.notificarAceite(solicitante, usuario, { ...demanda, data_acordada: dataAcordada });
-  await whatsappService.enviarMensagem(usuario, `✅ Aceito!\n"${demanda.descricao}"\nPrazo: ${formatarData(dataAcordada)}`);
+  // Notifica a outra parte
+  const ehResponsavel = demanda.responsavel_id === usuario.id;
+  const outraParteId = ehResponsavel ? demanda.solicitante_id : demanda.responsavel_id;
+  const outraParte = db.prepare('SELECT * FROM usuarios WHERE id=?').get(outraParteId);
+
+  if (ehResponsavel) {
+    await whatsappService.notificarAceite(outraParte, usuario, { ...demanda, data_acordada: dataAcordada });
+  } else {
+    await whatsappService.enviarMensagem(outraParte,
+      `✅ *Prazo aceito!*\n\n${usuario.nome} aceitou o prazo de *${formatarData(dataAcordada)}*\n` +
+      `"${demanda.descricao}"\n\n💬 Falar com ${usuario.nome.split(' ')[0]}: ${whatsappService.linkWhatsApp(usuario)}`
+    );
+  }
+
+  // Pergunta sobre Google Calendar
+  setSessao(telefone, {
+    fluxo: 'aguardando_calendario',
+    descricao: demanda.descricao,
+    data: dataAcordada,
+  });
+
+  await whatsappService.enviarMensagem(usuario,
+    `✅ *Aceito!*\n"${demanda.descricao}"\nPrazo: ${formatarData(dataAcordada)}\n\n` +
+    `📅 Deseja adicionar ao *Google Agenda*?\n\n*1* — Sim, enviar link\n*2* — Não`
+  );
+  res.status(200).send('OK');
+}
+
+async function fluxoCalendario(usuario, texto, sessao, telefone, res) {
   clearSessao(telefone);
+
+  if (texto === '1') {
+    const link = gerarLinkCalendario(sessao.descricao, sessao.data);
+    await whatsappService.enviarMensagem(usuario,
+      `📅 *Adicionar ao Google Agenda:*\n\n${link}\n\n_Clique no link para abrir e salvar o evento._`
+    );
+  } else {
+    await whatsappService.enviarMensagem(usuario, `👍 Ok! A demanda foi aceita.`);
+  }
   res.status(200).send('OK');
 }
 
