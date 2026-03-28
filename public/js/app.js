@@ -331,13 +331,12 @@ async function abrirModal(id) {
 
       ${(() => {
         const prazoData = demanda.data_acordada || demanda.data_entrega;
-        const link = gerarLinkCalendario(demanda.descricao, prazoData, demanda.horario_entrega);
-        return link ? `<div style="margin:8px 0 4px">
-          <a href="${link}" target="_blank" rel="noopener"
-            style="display:inline-flex;align-items:center;gap:6px;font-size:.85rem;color:#1a73e8;text-decoration:none;font-weight:500">
-            📅 Adicionar ao Google Agenda
-          </a>
-        </div>` : '';
+        const calLink = gerarLinkCalendario(demanda.descricao, prazoData, demanda.horario_entrega);
+        const cuLink = demanda.clickup_url || null;
+        const links = [];
+        if (calLink) links.push(`<a href="${calLink}" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:5px;font-size:.85rem;color:#1a73e8;text-decoration:none;font-weight:500">📅 Google Agenda</a>`);
+        if (cuLink) links.push(`<a href="${cuLink}" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:5px;font-size:.85rem;color:#7b68ee;text-decoration:none;font-weight:500">🟣 Abrir no ClickUp</a>`);
+        return links.length ? `<div style="display:flex;gap:16px;margin:10px 0 4px;flex-wrap:wrap">${links.join('')}</div>` : '';
       })()}
 
       <div class="modal-section">

@@ -6,6 +6,7 @@ const { getSessao, setSessao, clearSessao } = require('../services/sessoes');
 const whatsappService = require('../services/whatsapp');
 const lembreteService = require('../services/lembretes');
 const iaService = require('../services/ia');
+const clickupService = require('../services/clickup');
 
 const router = express.Router();
 
@@ -291,17 +292,31 @@ async function fluxoCriarConfirmacao(usuario, texto, comando, parametros, sessao
 
   lembreteService.agendarLembretes(id, sessao.data_entrega);
 
+  // Cria tarefa no ClickUp (se configurado)
+  let clickup_url = null;
+  try {
+    clickup_url = await clickupService.criarTarefa({
+      descricao: sessao.descricao, data_entrega: sessao.data_entrega,
+      horario_entrega: sessao.horario_entrega, solicitante: usuario, responsavel: sessao.responsavel,
+    });
+    if (clickup_url) db.prepare('UPDATE demandas SET clickup_url = ? WHERE id = ?').run(clickup_url, id);
+  } catch (err) {
+    console.error('[ClickUp] Erro ao criar tarefa:', err.message);
+  }
+
   const responsavelCompleto = db.prepare('SELECT * FROM usuarios WHERE id = ?').get(sessao.responsavel.id);
   await whatsappService.notificarNovaDeamanda(responsavelCompleto, usuario, {
-    id, descricao: sessao.descricao, data_entrega: sessao.data_entrega, horario_entrega: sessao.horario_entrega || null,
+    id, descricao: sessao.descricao, data_entrega: sessao.data_entrega,
+    horario_entrega: sessao.horario_entrega || null, clickup_url,
   });
 
   clearSessao(telefone);
+  const clickupMsg = clickup_url ? `\n🟣 ClickUp: ${clickup_url}` : '';
   await whatsappService.enviarMensagem(usuario,
     `🎉 *Demanda criada com sucesso!*\n\n` +
     `📋 ${sessao.descricao}\n` +
     `👤 Responsável: ${sessao.responsavel.nome}\n` +
-    `📅 Entrega: ${formatarDataHora(sessao.data_entrega, sessao.horario_entrega)}\n\n` +
+    `📅 Entrega: ${formatarDataHora(sessao.data_entrega, sessao.horario_entrega)}${clickupMsg}\n\n` +
     `${sessao.responsavel.nome} foi notificado(a).`
   );
   res.status(200).send('OK');

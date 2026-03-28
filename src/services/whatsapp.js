@@ -123,11 +123,12 @@ async function enviarMensagem(destinatario, mensagem) {
 // ── Notificações ──────────────────────────────────────────────────────────────
 
 async function notificarNovaDeamanda(responsavel, solicitante, demanda) {
+  const clickupLinha = demanda.clickup_url ? `\n🟣 ClickUp: ${demanda.clickup_url}` : '';
   const msg =
     `📋 *Nova Atividade Recebida*\n\n` +
     `De: ${solicitante.nome}\n` +
     `Tarefa: ${demanda.descricao}\n` +
-    `Prazo: ${formatarDataHora(demanda.data_entrega, demanda.horario_entrega)}\n\n` +
+    `Prazo: ${formatarDataHora(demanda.data_entrega, demanda.horario_entrega)}${clickupLinha}\n\n` +
     `💬 Falar com ${solicitante.nome.split(' ')[0]}: ${linkWhatsApp(solicitante)}\n` +
     `─────────────────\n` +
     `✅ *1* — Aceitar\n` +

@@ -3,6 +3,7 @@ const { v4: uuidv4 } = require('uuid');
 const getDb = require('../database/db');
 const whatsappService = require('../services/whatsapp');
 const lembreteService = require('../services/lembretes');
+const clickupService = require('../services/clickup');
 
 const router = express.Router();
 
@@ -77,8 +78,19 @@ router.post('/', async (req, res) => {
   // Agenda lembretes para responsável
   lembreteService.agendarLembretes(id, data_entrega);
 
+  // Cria tarefa no ClickUp (se configurado)
+  let clickup_url = null;
+  try {
+    clickup_url = await clickupService.criarTarefa({ descricao, data_entrega, horario_entrega, solicitante, responsavel });
+    if (clickup_url) {
+      db.prepare('UPDATE demandas SET clickup_url = ? WHERE id = ?').run(clickup_url, id);
+    }
+  } catch (err) {
+    console.error('[ClickUp] Erro ao criar tarefa:', err.message);
+  }
+
   // Notifica responsável via WhatsApp
-  await whatsappService.notificarNovaDeamanda(responsavel, solicitante, { id, descricao, data_entrega, horario_entrega: horario_entrega || null });
+  await whatsappService.notificarNovaDeamanda(responsavel, solicitante, { id, descricao, data_entrega, horario_entrega: horario_entrega || null, clickup_url });
 
   const demanda = db.prepare('SELECT * FROM demandas WHERE id = ?').get(id);
   res.status(201).json(demandaComUsuarios(demanda));

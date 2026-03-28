@@ -52,6 +52,8 @@ db.exec(`
 try { db.prepare('ALTER TABLE demandas RENAME COLUMN data_esperada TO data_entrega').run(); console.log('[Migration] Coluna data_esperada → data_entrega'); } catch (_) {}
 // Migration: add horario_entrega
 try { db.prepare('ALTER TABLE demandas ADD COLUMN horario_entrega TEXT').run(); console.log('[Migration] Adicionada coluna horario_entrega'); } catch (_) {}
+// Migration: add clickup_url
+try { db.prepare('ALTER TABLE demandas ADD COLUMN clickup_url TEXT').run(); console.log('[Migration] Adicionada coluna clickup_url'); } catch (_) {}
 
 // Insere configurações padrão se ainda não existirem
 const defaults = {
