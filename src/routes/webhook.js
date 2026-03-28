@@ -99,18 +99,21 @@ async function fluxoCriarDescricao(usuario, texto, telefone, res) {
   if (texto === '0') { clearSessao(telefone); await whatsappService.enviarMensagem(usuario, '❌ Criação cancelada.'); return res.status(200).send('OK'); }
 
   const db = getDb();
-  const outros = db.prepare('SELECT * FROM usuarios WHERE id != ? ORDER BY nome').all(usuario.id);
+  const todos = db.prepare('SELECT * FROM usuarios ORDER BY nome').all();
 
-  if (outros.length === 0) {
+  if (todos.length === 0) {
     clearSessao(telefone);
-    await whatsappService.enviarMensagem(usuario, '⚠️ Nenhum outro usuário cadastrado para ser responsável.');
+    await whatsappService.enviarMensagem(usuario, '⚠️ Nenhum usuário cadastrado no sistema.');
     return res.status(200).send('OK');
   }
 
-  setSessao(telefone, { fluxo: 'criar_responsavel', descricao: texto, usuarios: outros });
+  setSessao(telefone, { fluxo: 'criar_responsavel', descricao: texto, usuarios: todos });
 
   let msg = `👤 *Para quem é essa tarefa?*\n\n`;
-  outros.forEach((u, i) => { msg += `*${i + 1}* — ${u.nome}\n`; });
+  todos.forEach((u, i) => {
+    const sufixo = u.id === usuario.id ? ' _(você)_' : '';
+    msg += `*${i + 1}* — ${u.nome}${sufixo}\n`;
+  });
   msg += `\n*0* — Cancelar`;
 
   await whatsappService.enviarMensagem(usuario, msg);
