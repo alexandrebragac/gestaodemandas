@@ -124,6 +124,8 @@ details summary { cursor: pointer; font-size: .85rem; color: var(--green-dark); 
 .btn-aceitar:hover { background: #229954; }
 .btn-concluir:hover { opacity: .9; }
 .btn-baixa:hover { opacity: .9; }
+.btn-excluir-demanda { background: #e74c3c; color: #fff; margin-left: auto; }
+.btn-excluir-demanda:hover { background: #c0392b; }
 
 .empty-state { text-align: center; padding: 48px 24px; color: var(--muted); }
 .empty-state .icon { font-size: 2.5rem; margin-bottom: 12px; }

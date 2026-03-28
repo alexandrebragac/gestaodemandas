@@ -236,8 +236,24 @@ function renderAcoes(d) {
     acoes.push(`<button class="btn-baixa" onclick="acao('${d.id}', 'baixa')">✔️ Dar Baixa</button>`);
   }
 
+  // Solicitante pode excluir demandas não finalizadas
+  if (d.status !== 'finalizada') {
+    acoes.push(`<button class="btn-excluir-demanda" onclick="excluirDemanda('${d.id}', '${d.solicitante?.nome || ''}')">🗑️ Excluir</button>`);
+  }
+
   if (acoes.length === 0) return '';
   return `<div class="action-row">${acoes.join('')}</div>`;
+}
+
+async function excluirDemanda(id, solicitante) {
+  if (!confirm(`Excluir esta demanda?\n\nApenas o solicitante (${solicitante}) deve fazer isso.\n\nEsta ação não pode ser desfeita.`)) return;
+  try {
+    await api(`/api/demandas/${id}`, { method: 'DELETE' });
+    fecharModal();
+    await carregarDemandas();
+  } catch (e) {
+    alert('Erro ao excluir demanda: ' + e.message);
+  }
 }
 
 async function acao(id, tipo) {

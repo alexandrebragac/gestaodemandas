@@ -222,6 +222,26 @@ router.post('/:id/baixa', async (req, res) => {
   res.json(demandaComUsuarios(atualizada));
 });
 
+// DELETE /demandas/:id  (apenas o solicitante pode excluir)
+router.delete('/:id', (req, res) => {
+  const db = getDb();
+  const demanda = db.prepare('SELECT * FROM demandas WHERE id = ?').get(req.params.id);
+  if (!demanda) return res.status(404).json({ erro: 'Demanda não encontrada' });
+
+  if (demanda.status === STATUS.FINALIZADA) {
+    return res.status(400).json({ erro: 'Demandas finalizadas não podem ser excluídas.' });
+  }
+
+  const excluir = db.transaction(() => {
+    db.prepare('DELETE FROM lembretes WHERE demanda_id = ?').run(demanda.id);
+    db.prepare('DELETE FROM mensagens WHERE demanda_id = ?').run(demanda.id);
+    db.prepare('DELETE FROM demandas WHERE id = ?').run(demanda.id);
+  });
+
+  excluir();
+  res.status(204).end();
+});
+
 // GET /demandas/:id/mensagens
 router.get('/:id/mensagens', (req, res) => {
   const db = getDb();
