@@ -83,14 +83,14 @@ function normalizarData(raw) {
 function mensagemAjuda() {
   return (
     `📖 *Comandos disponíveis:*\n\n` +
-    `*1* — Aceitar demanda/prazo\n` +
-    `*2* — Propor novo prazo\n` +
-    `*3* — Marcar como concluído\n` +
-    `*4* — Dar baixa (confirmar conclusão)\n` +
-    `*5* — Ver minhas demandas\n` +
-    `*7* — Criar nova demanda\n` +
-    `*8* — Editar demanda\n` +
-    `*6* — Ajuda`
+    `✅ *1* — Aceitar atividade/prazo\n` +
+    `🎉 *2* — Confirmar conclusão\n` +
+    `✔️ *3* — Concluir atividade\n` +
+    `🚧 *4* — Reportar impedimento\n` +
+    `📅 *5* — Solicitar novo prazo\n` +
+    `📋 *6* — Ver minhas atividades\n` +
+    `➕ *7* — Criar nova atividade\n` +
+    `✏️ *8* — Editar atividade`
   );
 }
 

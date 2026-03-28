@@ -65,7 +65,7 @@ function gerarMenuContextual(usuario) {
     }
 
     if (aguardaBaixa > 0) {
-      urgentes.push(`🎉 *4* — Confirmar conclusão _(${aguardaBaixa})_`);
+      urgentes.push(`🎉 *2* — Confirmar conclusão _(${aguardaBaixa})_`);
     }
 
     // ── Ações de andamento ───────────────────────────────────────────────────
@@ -74,15 +74,15 @@ function gerarMenuContextual(usuario) {
     }
 
     if (pendenteAceite > 0 || emAtividade > 0) {
-      acoes.push(`🚧 *9* — Reportar impedimento`);
+      acoes.push(`🚧 *4* — Reportar impedimento`);
     }
 
     if (pendenteAceite > 0 || emAtividade > 0 || negResp > 0) {
-      acoes.push(`📅 *2* — Solicitar novo prazo`);
+      acoes.push(`📅 *5* — Solicitar novo prazo`);
     }
 
     // ── Utilitários (sempre visíveis) ────────────────────────────────────────
-    uteis.push(`📋 *5* — Ver minhas atividades`);
+    uteis.push(`📋 *6* — Ver minhas atividades`);
     uteis.push(`➕ *7* — Criar nova atividade`);
     uteis.push(`✏️ *8* — Editar atividade`);
 
@@ -131,8 +131,8 @@ async function notificarNovaDeamanda(responsavel, solicitante, demanda) {
     `💬 Falar com ${solicitante.nome.split(' ')[0]}: ${linkWhatsApp(solicitante)}\n` +
     `─────────────────\n` +
     `✅ *1* — Aceitar\n` +
-    `📅 *2* — Solicitar novo prazo\n` +
-    `🚧 *9* — Reportar impedimento`;
+    `📅 *5* — Solicitar novo prazo\n` +
+    `🚧 *4* — Reportar impedimento`;
   await enviarMensagem(responsavel, msg);
 }
 
@@ -155,7 +155,7 @@ async function notificarNovoPrazo(solicitante, responsavel, demanda, justificati
     `💬 Falar com ${responsavel.nome.split(' ')[0]}: ${linkWhatsApp(responsavel)}\n` +
     `─────────────────\n` +
     `✅ *1* — Aceitar novo prazo\n` +
-    `📅 *2* — Propor outro prazo`;
+    `📅 *5* — Propor outro prazo`;
   await enviarMensagem(solicitante, msg);
 }
 
@@ -166,7 +166,7 @@ async function notificarConclusao(solicitante, responsavel, demanda) {
     `"${demanda.descricao}"\n\n` +
     `💬 Falar com ${responsavel.nome.split(' ')[0]}: ${linkWhatsApp(responsavel)}\n` +
     `─────────────────\n` +
-    `🎉 *4* — Confirmar conclusão`;
+    `🎉 *2* — Confirmar conclusão`;
   await enviarMensagem(solicitante, msg);
 }
 
@@ -187,7 +187,7 @@ async function notificarImpedimento(solicitante, responsavel, demanda, descricao
     `Motivo: _${descricao}_\n\n` +
     `💬 Falar com ${responsavel.nome.split(' ')[0]}: ${linkWhatsApp(responsavel)}\n` +
     `─────────────────\n` +
-    `📅 *2* — Propor novo prazo\n` +
+    `📅 *5* — Propor novo prazo\n` +
     `➕ *7* — Criar nova atividade`;
   await enviarMensagem(solicitante, msg);
 }
@@ -202,8 +202,8 @@ async function enviarLembrete(destinatario, demanda, tipoLembrete, solicitante =
   const opcoesPrazo =
     `─────────────────\n` +
     `✔️ *3* — Concluir atividade\n` +
-    `📅 *2* — Solicitar novo prazo\n` +
-    `🚧 *9* — Reportar impedimento`;
+    `🚧 *4* — Reportar impedimento\n` +
+    `📅 *5* — Solicitar novo prazo`;
 
   const mensagens = {
     antes_vencimento_3:
@@ -231,8 +231,8 @@ async function enviarLembrete(destinatario, demanda, tipoLembrete, solicitante =
       `Prazo: ${prazo}${linkSolicitante}\n\n` +
       `─────────────────\n` +
       `✅ *1* — Aceitar\n` +
-      `📅 *2* — Solicitar novo prazo\n` +
-      `🚧 *9* — Reportar impedimento`,
+      `🚧 *4* — Reportar impedimento\n` +
+      `📅 *5* — Solicitar novo prazo`,
 
     aguardando_baixa:
       `⏳ *Aguardando sua confirmação*\n\n` +

@@ -419,7 +419,7 @@ async function fluxoEditarNovoPrazo(usuario, texto, comando, parametros, sessao,
 
   const responsavel = db.prepare('SELECT * FROM usuarios WHERE id = ?').get(sessao.demanda.responsavel_id);
   await whatsappService.enviarMensagem(responsavel,
-    `📅 *Prazo alterado*\n\n${usuario.nome} alterou o prazo de:\n"${sessao.demanda.descricao}"\n\nNovo prazo: *${formatarData(data)}*\n\n*1* — Aceitar\n*2* — Propor outro prazo`
+    `📅 *Prazo alterado*\n\n${usuario.nome} alterou o prazo de:\n"${sessao.demanda.descricao}"\n\nNovo prazo: *${formatarData(data)}*\n\n✅ *1* — Aceitar\n📅 *5* — Propor outro prazo`
   );
 
   clearSessao(telefone);
@@ -433,15 +433,14 @@ async function fluxoEditarNovoPrazo(usuario, texto, comando, parametros, sessao,
 
 async function handleNumeroMenu(usuario, numero, sessao, telefone, res) {
   const mapa = {
-    1: COMANDOS.ACEITAR,
-    2: 'pedir_prazo',
-    3: COMANDOS.CONCLUIR,
-    4: COMANDOS.BAIXA,
-    5: COMANDOS.STATUS,
-    6: COMANDOS.AJUDA,
-    7: COMANDOS.NOVA_DEMANDA,
-    8: COMANDOS.EDITAR_DEMANDA,
-    9: 'impedimento',
+    1: COMANDOS.ACEITAR,          // ✅ Aceitar
+    2: COMANDOS.BAIXA,            // 🎉 Confirmar conclusão
+    3: COMANDOS.CONCLUIR,         // ✔️ Concluir atividade
+    4: 'impedimento',             // 🚧 Reportar impedimento
+    5: 'pedir_prazo',             // 📅 Solicitar novo prazo
+    6: COMANDOS.STATUS,           // 📋 Ver minhas atividades
+    7: COMANDOS.NOVA_DEMANDA,     // ➕ Criar nova atividade
+    8: COMANDOS.EDITAR_DEMANDA,   // ✏️ Editar atividade
   };
 
   const acao = mapa[numero];
