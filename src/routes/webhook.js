@@ -79,16 +79,29 @@ const FLUXOS_TEXTO = new Set([
 
 // ── Google Calendar ───────────────────────────────────────────────────────────
 
-function gerarLinkCalendario(descricao, dataIso) {
-  const inicio = dataIso.replace(/-/g, '');
-  const fim = (() => {
-    const d = new Date(dataIso + 'T12:00:00Z');
-    d.setUTCDate(d.getUTCDate() + 1);
-    return d.toISOString().slice(0, 10).replace(/-/g, '');
-  })();
+function gerarLinkCalendario(descricao, dataIso, horario) {
   const titulo = encodeURIComponent(descricao.substring(0, 80));
   const detalhes = encodeURIComponent('Prazo de atividade — Gestão de Demandas');
-  return `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${titulo}&dates=${inicio}/${fim}&details=${detalhes}`;
+
+  let dates;
+  if (horario) {
+    // Evento com horário: duração de 1 hora
+    const [h, m] = horario.split(':');
+    const base = dataIso.replace(/-/g, '');
+    const hInicio = `${String(h).padStart(2,'0')}${String(m).padStart(2,'0')}00`;
+    const hFim = `${String(parseInt(h) + 1).padStart(2,'0')}${String(m).padStart(2,'0')}00`;
+    dates = `${base}T${hInicio}/${base}T${hFim}`;
+    return `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${titulo}&dates=${dates}&details=${detalhes}&ctz=America%2FSao_Paulo`;
+  } else {
+    // Evento de dia inteiro
+    const base = dataIso.replace(/-/g, '');
+    const proximo = (() => {
+      const d = new Date(dataIso + 'T12:00:00Z');
+      d.setUTCDate(d.getUTCDate() + 1);
+      return d.toISOString().slice(0, 10).replace(/-/g, '');
+    })();
+    return `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${titulo}&dates=${base}/${proximo}&details=${detalhes}`;
+  }
 }
 
 // ── Roteador de fluxos ativos ─────────────────────────────────────────────────
@@ -529,6 +542,7 @@ async function handleAceitar(usuario, telefone, res) {
     fluxo: 'aguardando_calendario',
     descricao: demanda.descricao,
     data: dataAcordada,
+    horario_entrega: demanda.horario_entrega || null,
   });
 
   await whatsappService.enviarMensagem(usuario,
@@ -542,7 +556,7 @@ async function fluxoCalendario(usuario, texto, sessao, telefone, res) {
   clearSessao(telefone);
 
   if (texto === '1') {
-    const link = gerarLinkCalendario(sessao.descricao, sessao.data);
+    const link = gerarLinkCalendario(sessao.descricao, sessao.data, sessao.horario_entrega);
     await whatsappService.enviarMensagem(usuario,
       `📅 *Adicionar ao Google Agenda:*\n\n${link}\n\n_Clique no link para abrir e salvar o evento._`
     );
