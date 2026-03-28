@@ -5,6 +5,7 @@ const { parsear, COMANDOS, normalizarData, mensagemAjuda } = require('../service
 const { getSessao, setSessao, clearSessao } = require('../services/sessoes');
 const whatsappService = require('../services/whatsapp');
 const lembreteService = require('../services/lembretes');
+const iaService = require('../services/ia');
 
 const router = express.Router();
 
@@ -58,14 +59,32 @@ router.post('/whatsapp', async (req, res) => {
     case COMANDOS.NOVA_DEMANDA: await iniciarCriacaoDemanda(usuario, telefone, res); break;
     case COMANDOS.EDITAR_DEMANDA: await iniciarEdicaoDemanda(usuario, telefone, res); break;
     default:
-      await whatsappService.enviarMensagem(usuario, `Não entendi. Digite *6* para ver os comandos.`);
-      res.status(200).send('OK');
+      await handlePerguntaIA(usuario, texto, res);
+      return;
   }
 });
+
+// Fluxos que esperam texto livre ou data (não seleção de lista por número)
+const FLUXOS_TEXTO = new Set(['criar_prazo', 'editar_nova_descricao', 'editar_novo_prazo', 'aguardando_data_prazo']);
 
 // ── Roteador de fluxos ativos ─────────────────────────────────────────────────
 
 async function continuarFluxo(usuario, texto, comando, parametros, sessao, telefone, res) {
+  // Interceção: usuário digitou um comando de menu (número) enquanto está em um
+  // fluxo que espera texto livre. Reenvia a pergunta atual para não perder o contexto.
+  if (
+    FLUXOS_TEXTO.has(sessao.fluxo) &&
+    texto !== '0' &&
+    comando === COMANDOS.NUMERO_MENU
+  ) {
+    const pergunta = sessao.pergunta_atual || 'Responda a pergunta acima.';
+    await whatsappService.enviarMensagem(
+      usuario,
+      `⚠️ *Ação em andamento!*\n\nVocê tem uma ação que precisa de resposta:\n\n${pergunta}\n\n_Digite *0* para cancelar._`
+    );
+    return res.status(200).send('OK');
+  }
+
   switch (sessao.fluxo) {
     case 'criar_descricao':       await fluxoCriarDescricao(usuario, texto, telefone, res); break;
     case 'criar_responsavel':     await fluxoCriarResponsavel(usuario, texto, comando, parametros, sessao, telefone, res); break;
@@ -75,7 +94,18 @@ async function continuarFluxo(usuario, texto, comando, parametros, sessao, telef
     case 'editar_campo':          await fluxoEditarCampo(usuario, texto, comando, parametros, sessao, telefone, res); break;
     case 'editar_nova_descricao': await fluxoEditarNovaDescricao(usuario, texto, sessao, telefone, res); break;
     case 'editar_novo_prazo':     await fluxoEditarNovoPrazo(usuario, texto, comando, parametros, sessao, telefone, res); break;
-    case 'aguardando_data_prazo': await handleNovoPrazoComData(usuario, sessao.demandaId, extrairData(texto, comando, parametros), telefone, res); break;
+    case 'aguardando_data_prazo': {
+      const dataExtraida = extrairData(texto, comando, parametros);
+      if (!dataExtraida && texto !== '0') {
+        await whatsappService.enviarMensagem(usuario,
+          `❓ Data inválida. Use *DD/MM/AAAA*\nEx: 15/04/2026\n\n` +
+          `📅 *Qual é o novo prazo?*\n_Digite a data ou *0* para cancelar._`
+        );
+        return res.status(200).send('OK');
+      }
+      await handleNovoPrazoComData(usuario, sessao.demandaId, dataExtraida, telefone, res);
+      break;
+    }
     default:
       clearSessao(telefone);
       await whatsappService.enviarMensagem(usuario, 'Sessão expirada. Digite *6* para ver os comandos.');
@@ -135,10 +165,9 @@ async function fluxoCriarResponsavel(usuario, texto, comando, parametros, sessao
     return res.status(200).send('OK');
   }
 
-  setSessao(telefone, { ...sessao, fluxo: 'criar_prazo', responsavel });
-  await whatsappService.enviarMensagem(usuario,
-    `📅 *Qual é o prazo?*\n\nResponda no formato *DD/MM/AAAA*\nEx: 30/04/2026\n\n*0* — Cancelar`
-  );
+  const perguntaPrazo = `📅 *Qual é o prazo?*\n\nResponda no formato *DD/MM/AAAA*\nEx: 30/04/2026\n\n*0* — Cancelar`;
+  setSessao(telefone, { ...sessao, fluxo: 'criar_prazo', responsavel, pergunta_atual: perguntaPrazo });
+  await whatsappService.enviarMensagem(usuario, perguntaPrazo);
   res.status(200).send('OK');
 }
 
@@ -147,7 +176,10 @@ async function fluxoCriarPrazo(usuario, texto, comando, parametros, sessao, tele
 
   const data = extrairData(texto, comando, parametros);
   if (!data) {
-    await whatsappService.enviarMensagem(usuario, `❓ Data inválida. Use o formato *DD/MM/AAAA*\nEx: 30/04/2026`);
+    await whatsappService.enviarMensagem(usuario,
+      `❓ Data inválida. Use o formato *DD/MM/AAAA*\nEx: 30/04/2026\n\n` +
+      `📅 *Qual é o prazo?*\n_Digite a data ou *0* para cancelar._`
+    );
     return res.status(200).send('OK');
   }
 
@@ -263,11 +295,10 @@ async function fluxoEditarCampo(usuario, texto, comando, parametros, sessao, tel
       `📝 Digite a nova descrição:\n\n_Atual: ${sessao.demanda.descricao}_\n\n*0* — Cancelar`
     );
   } else if (num === 2) {
-    setSessao(telefone, { ...sessao, fluxo: 'editar_novo_prazo' });
     const prazoAtual = formatarData(sessao.demanda.data_acordada || sessao.demanda.data_esperada);
-    await whatsappService.enviarMensagem(usuario,
-      `📅 Digite o novo prazo (*DD/MM/AAAA*):\n\n_Atual: ${prazoAtual}_\n\n*0* — Cancelar`
-    );
+    const perguntaNovoPrazo = `📅 *Novo prazo* (*DD/MM/AAAA*):\n\n_Atual: ${prazoAtual}_\n\n*0* — Cancelar`;
+    setSessao(telefone, { ...sessao, fluxo: 'editar_novo_prazo', pergunta_atual: perguntaNovoPrazo });
+    await whatsappService.enviarMensagem(usuario, perguntaNovoPrazo);
   } else {
     await whatsappService.enviarMensagem(usuario, `⚠️ Opção inválida.\n*1* — Descrição\n*2* — Prazo\n*0* — Cancelar`);
   }
@@ -296,7 +327,11 @@ async function fluxoEditarNovoPrazo(usuario, texto, comando, parametros, sessao,
 
   const data = extrairData(texto, comando, parametros);
   if (!data) {
-    await whatsappService.enviarMensagem(usuario, `❓ Data inválida. Use *DD/MM/AAAA*\nEx: 30/04/2026`);
+    const prazoAtual = formatarData(sessao.demanda.data_acordada || sessao.demanda.data_esperada);
+    await whatsappService.enviarMensagem(usuario,
+      `❓ Data inválida. Use *DD/MM/AAAA*\nEx: 30/04/2026\n\n` +
+      `📅 *Novo prazo para:* "${sessao.demanda.descricao.substring(0, 40)}"\n_Atual: ${prazoAtual}_\n_Digite a data ou *0* para cancelar._`
+    );
     return res.status(200).send('OK');
   }
 
@@ -349,8 +384,9 @@ async function handleNumeroMenu(usuario, numero, sessao, telefone, res) {
   if (acao === COMANDOS.EDITAR_DEMANDA)  { return iniciarEdicaoDemanda(usuario, telefone, res); }
 
   if (acao === 'pedir_prazo') {
-    setSessao(telefone, { fluxo: 'aguardando_data_prazo', demandaId: sessao?.demandaId || null });
-    await whatsappService.enviarMensagem(usuario, `📅 Qual é o novo prazo?\nResponda no formato *DD/MM/AAAA*\nEx: 15/04/2026`);
+    const perguntaPrazoNovo = `📅 *Qual é o novo prazo?*\nResponda no formato *DD/MM/AAAA*\nEx: 15/04/2026\n\n*0* — Cancelar`;
+    setSessao(telefone, { fluxo: 'aguardando_data_prazo', demandaId: sessao?.demandaId || null, pergunta_atual: perguntaPrazoNovo });
+    await whatsappService.enviarMensagem(usuario, perguntaPrazoNovo);
     return res.status(200).send('OK');
   }
 
@@ -490,6 +526,31 @@ async function handleBaixa(usuario, telefone, res) {
   await whatsappService.notificarBaixa(responsavel, usuario, demanda);
   await whatsappService.enviarMensagem(usuario, `✔️ Baixa confirmada!\n"${demanda.descricao}"\nDemanda finalizada!`);
   clearSessao(telefone);
+  res.status(200).send('OK');
+}
+
+// ── Assistente IA ─────────────────────────────────────────────────────────────
+
+async function handlePerguntaIA(usuario, texto, res) {
+  // Entradas muito curtas ou que parecem comandos não reconhecidos
+  if (texto.length <= 3) {
+    await whatsappService.enviarMensagem(usuario, `Não entendi "*${texto}*". Digite *6* para ver os comandos ou faça uma pergunta sobre suas atividades.`);
+    return res.status(200).send('OK');
+  }
+
+  if (!process.env.ANTHROPIC_API_KEY) {
+    await whatsappService.enviarMensagem(usuario, `Não entendi. Digite *6* para ver os comandos.`);
+    return res.status(200).send('OK');
+  }
+
+  try {
+    await whatsappService.enviarMensagem(usuario, `🤖 Consultando IA...`);
+    const resposta = await iaService.responderPergunta(usuario, texto);
+    await whatsappService.enviarMensagem(usuario, `🤖 *Assistente IA*\n\n${resposta}`);
+  } catch (e) {
+    console.error('[IA] Erro:', e.message);
+    await whatsappService.enviarMensagem(usuario, `Não consegui processar sua pergunta. Tente novamente ou use os comandos numéricos.`);
+  }
   res.status(200).send('OK');
 }
 

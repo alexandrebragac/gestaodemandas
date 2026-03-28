@@ -11,6 +11,7 @@
     "reset": "node src/database/reset.js"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.80.0",
     "better-sqlite3": "^9.4.3",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
