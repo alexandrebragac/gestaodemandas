@@ -47,7 +47,7 @@ function agendarJobRelatorio() {
     console.log(`[Scheduler] Executando relatório das ${horario}...`);
     await enviarRelatoriosDiarios();
     await processarLembretes();
-  });
+  }, { timezone: 'America/Sao_Paulo' });
 }
 
 function reconfigurarScheduler() {
@@ -66,20 +66,29 @@ async function enviarRelatoriosDiarios() {
 
   const usuarios = db.prepare(`
     SELECT DISTINCT u.* FROM usuarios u
-    JOIN demandas d ON d.responsavel_id = u.id
+    JOIN demandas d ON d.responsavel_id = u.id OR d.solicitante_id = u.id
     WHERE d.status NOT IN ('finalizada', 'concluida_aguardando_baixa')
   `).all();
 
   console.log(`[Scheduler] Enviando relatório para ${usuarios.length} usuário(s)...`);
 
   for (const usuario of usuarios) {
-    const demandasAtivas = db.prepare(`
-      SELECT * FROM demandas
-      WHERE responsavel_id = ? AND status NOT IN ('finalizada', 'concluida_aguardando_baixa')
-      ORDER BY data_entrega ASC
+    const demandasResp = db.prepare(`
+      SELECT d.*, u.nome AS outro_nome FROM demandas d
+      JOIN usuarios u ON u.id = d.solicitante_id
+      WHERE d.responsavel_id = ? AND d.status NOT IN ('finalizada', 'concluida_aguardando_baixa')
+      ORDER BY d.data_entrega ASC
+    `).all(usuario.id);
+
+    const demandasSol = db.prepare(`
+      SELECT d.*, u.nome AS outro_nome FROM demandas d
+      JOIN usuarios u ON u.id = d.responsavel_id
+      WHERE d.solicitante_id = ? AND d.status NOT IN ('finalizada', 'concluida_aguardando_baixa')
+      ORDER BY d.data_entrega ASC
     `).all(usuario.id);
 
     const prazo = d => d.data_acordada || d.data_entrega;
+    const demandasAtivas = [...demandasResp, ...demandasSol.filter(d => !demandasResp.find(r => r.id === d.id))];
     const vencidas         = demandasAtivas.filter(d => prazo(d) < hoje);
     const vencem_hoje      = demandasAtivas.filter(d => prazo(d) === hoje);
     const vencem_em_3_dias = demandasAtivas.filter(d => prazo(d) > hoje && prazo(d) <= em3diasStr);
