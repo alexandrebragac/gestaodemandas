@@ -1,6 +1,6 @@
 /**
  * Parser de comandos recebidos via WhatsApp.
- * Aceita tanto texto livre quanto números do menu.
+ * Aceita números do menu e texto livre.
  */
 
 const COMANDOS = {
@@ -10,53 +10,51 @@ const COMANDOS = {
   BAIXA: 'baixa',
   STATUS: 'status',
   AJUDA: 'ajuda',
-  DATA: 'data',             // usuário enviou uma data após escolher "novo prazo"
-  NUMERO_MENU: 'numero_menu', // usuário digitou um número do menu
+  NOVA_DEMANDA: 'nova_demanda',
+  EDITAR_DEMANDA: 'editar_demanda',
+  DATA: 'data',
+  NUMERO_MENU: 'numero_menu',
   DESCONHECIDO: 'desconhecido',
 };
 
 function parsear(texto) {
   const msg = (texto || '').trim();
-  const msgLower = msg.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  const norm = msg.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
 
-  // Número do menu (1, 2, 3...)
+  // Número do menu
   if (/^\d+$/.test(msg)) {
     return { comando: COMANDOS.NUMERO_MENU, parametros: { numero: parseInt(msg) } };
   }
 
-  // aceito / ok / aceitar
-  if (/^(aceito|ok|aceitar|sim|confirmado)$/i.test(msgLower)) {
+  if (/^(aceito|ok|aceitar|sim|confirmado)$/i.test(norm))
     return { comando: COMANDOS.ACEITAR };
-  }
 
-  // concluido / feito
-  if (/^(conclu[ií]do|feito|concluir|terminei|pronto|finalizado|finalizar)$/i.test(msgLower)) {
+  if (/^(conclu[ií]do|feito|concluir|terminei|pronto|finalizado|finalizar)$/i.test(norm))
     return { comando: COMANDOS.CONCLUIR };
-  }
 
-  // baixa / confirmo
-  if (/^(baixa|confirmo|confirmei|validado|validar)$/i.test(msgLower)) {
+  if (/^(baixa|confirmo|confirmei|validado|validar)$/i.test(norm))
     return { comando: COMANDOS.BAIXA };
-  }
 
-  // status / listar
-  if (/^(status|minhas demandas|demandas|listar|lista)$/i.test(msgLower)) {
+  if (/^(status|minhas demandas|demandas|listar|lista)$/i.test(norm))
     return { comando: COMANDOS.STATUS };
-  }
 
-  // ajuda
-  if (/^(ajuda|help|comandos|\?)$/i.test(msgLower)) {
+  if (/^(ajuda|help|comandos|\?)$/i.test(norm))
     return { comando: COMANDOS.AJUDA };
-  }
 
-  // novo prazo: DD/MM ou DD/MM/AAAA
-  const prazoMatch = msgLower.match(/novo\s+prazo[:\s]+(\d{1,2}\/\d{1,2}(?:\/\d{2,4})?|\d{4}-\d{2}-\d{2})/);
+  if (/^(nova|nova demanda|criar|criar demanda|novo)$/i.test(norm))
+    return { comando: COMANDOS.NOVA_DEMANDA };
+
+  if (/^(editar|editar demanda|alterar|modificar)$/i.test(norm))
+    return { comando: COMANDOS.EDITAR_DEMANDA };
+
+  // novo prazo: DD/MM/AAAA
+  const prazoMatch = norm.match(/novo\s+prazo[:\s]+(\d{1,2}\/\d{1,2}(?:\/\d{2,4})?|\d{4}-\d{2}-\d{2})/);
   if (prazoMatch) {
     const data = normalizarData(prazoMatch[1]);
     if (data) return { comando: COMANDOS.NOVO_PRAZO, parametros: { data } };
   }
 
-  // Data isolada (ex: "28/04/2026") — usada após menu "2 - Novo Prazo"
+  // Data isolada
   const dataMatch = msg.match(/^(\d{1,2}\/\d{1,2}(?:\/\d{2,4})?|\d{4}-\d{2}-\d{2})$/);
   if (dataMatch) {
     const data = normalizarData(dataMatch[1]);
@@ -83,12 +81,14 @@ function normalizarData(raw) {
 function mensagemAjuda() {
   return (
     `📖 *Comandos disponíveis:*\n\n` +
-    `*1* ou *aceito* — aceitar demanda/prazo proposto\n` +
-    `*2* ou *novo prazo: DD/MM/AAAA* — propor novo prazo\n` +
-    `*3* ou *concluído* — marcar tarefa como concluída\n` +
-    `*4* ou *baixa* — confirmar conclusão (solicitante)\n` +
-    `*5* ou *status* — ver suas demandas pendentes\n` +
-    `*6* ou *ajuda* — exibir esta mensagem`
+    `*1* — Aceitar demanda/prazo\n` +
+    `*2* — Propor novo prazo\n` +
+    `*3* — Marcar como concluído\n` +
+    `*4* — Dar baixa (confirmar conclusão)\n` +
+    `*5* — Ver minhas demandas\n` +
+    `*7* — Criar nova demanda\n` +
+    `*8* — Editar demanda\n` +
+    `*6* — Ajuda`
   );
 }
 
