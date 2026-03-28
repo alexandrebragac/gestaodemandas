@@ -82,6 +82,28 @@
       </section>
     </div>
 
+    <!-- Modal de edição de usuário -->
+    <div id="modal-usuario" class="modal hidden">
+      <div class="modal-content" style="max-width:400px">
+        <button class="modal-close" onclick="document.getElementById('modal-usuario').classList.add('hidden')">✕</button>
+        <h2 style="margin-bottom:16px;color:var(--green-dark)">Editar Usuário</h2>
+        <form id="form-editar-usuario">
+          <input type="hidden" id="edit-usuario-id" />
+          <label>Nome
+            <input type="text" id="edit-usuario-nome" required />
+          </label>
+          <label style="margin-top:10px">Telefone (com DDI)
+            <input type="text" id="edit-usuario-telefone" placeholder="+5511999990001" required />
+          </label>
+          <div style="display:flex;gap:8px;margin-top:14px">
+            <button type="submit" class="btn-primary" style="flex:1">Salvar</button>
+            <button type="button" class="btn-secondary" onclick="document.getElementById('modal-usuario').classList.add('hidden')">Cancelar</button>
+          </div>
+          <div id="edit-usuario-msg" class="form-msg"></div>
+        </form>
+      </div>
+    </div>
+
     <!-- Modal de detalhes -->
     <div id="modal" class="modal hidden">
       <div class="modal-content">

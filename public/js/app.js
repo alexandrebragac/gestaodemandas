@@ -100,25 +100,16 @@ function renderUsuarios() {
   `).join('');
 }
 
-async function abrirEdicaoUsuario(id) {
+function abrirEdicaoUsuario(id) {
   const u = usuarios.find(x => x.id === id);
   if (!u) return;
 
-  const novoNome = prompt('Nome:', u.nome);
-  if (novoNome === null) return;
-
-  const novoTel = prompt('Telefone (com DDI, ex: +5585999990001):', u.telefone_whatsapp);
-  if (novoTel === null) return;
-
-  try {
-    await api(`/api/usuarios/${id}`, {
-      method: 'PUT',
-      body: { nome: novoNome.trim(), telefone_whatsapp: novoTel.trim() },
-    });
-    await carregarUsuarios();
-  } catch (e) {
-    alert('Erro ao editar: ' + e.message);
-  }
+  document.getElementById('edit-usuario-id').value = u.id;
+  document.getElementById('edit-usuario-nome').value = u.nome;
+  document.getElementById('edit-usuario-telefone').value = u.telefone_whatsapp;
+  document.getElementById('edit-usuario-msg').textContent = '';
+  document.getElementById('modal-usuario').classList.remove('hidden');
+  document.getElementById('edit-usuario-nome').focus();
 }
 
 async function excluirUsuario(id, nome) {
@@ -264,6 +255,23 @@ function fecharModal() {
 }
 
 // ── Formulários ──────────────────────────────────────────────────────────────
+
+document.getElementById('form-editar-usuario').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const id = document.getElementById('edit-usuario-id').value;
+  const body = {
+    nome: document.getElementById('edit-usuario-nome').value.trim(),
+    telefone_whatsapp: document.getElementById('edit-usuario-telefone').value.trim(),
+  };
+
+  try {
+    await api(`/api/usuarios/${id}`, { method: 'PUT', body });
+    document.getElementById('modal-usuario').classList.add('hidden');
+    await carregarUsuarios();
+  } catch (err) {
+    showMsg('edit-usuario-msg', '❌ ' + err.message, 'err');
+  }
+});
 
 document.getElementById('form-demanda').addEventListener('submit', async (e) => {
   e.preventDefault();

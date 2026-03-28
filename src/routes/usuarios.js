@@ -65,8 +65,20 @@ router.put('/:id', (req, res) => {
 // DELETE /usuarios/:id
 router.delete('/:id', (req, res) => {
   const db = getDb();
-  const info = db.prepare('DELETE FROM usuarios WHERE id = ?').run(req.params.id);
-  if (info.changes === 0) return res.status(404).json({ erro: 'Usuário não encontrado' });
+  const usuario = db.prepare('SELECT * FROM usuarios WHERE id = ?').get(req.params.id);
+  if (!usuario) return res.status(404).json({ erro: 'Usuário não encontrado' });
+
+  const demandas = db.prepare(
+    'SELECT COUNT(*) as total FROM demandas WHERE solicitante_id = ? OR responsavel_id = ?'
+  ).get(req.params.id, req.params.id);
+
+  if (demandas.total > 0) {
+    return res.status(409).json({
+      erro: `Não é possível excluir "${usuario.nome}" pois possui ${demandas.total} demanda(s) vinculada(s). Finalize ou reatribua as demandas antes de excluir.`
+    });
+  }
+
+  db.prepare('DELETE FROM usuarios WHERE id = ?').run(req.params.id);
   res.status(204).end();
 });
 
