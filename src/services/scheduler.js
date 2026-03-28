@@ -158,7 +158,8 @@ async function enviarLembrete(lembrete, db) {
     } else {
       tipo = 'apos_vencimento';
     }
-    await whatsappService.enviarLembrete(responsavel, demanda, tipo);
+    const solicitante = db.prepare('SELECT * FROM usuarios WHERE id = ?').get(lembrete.solicitante_id);
+    await whatsappService.enviarLembrete(responsavel, demanda, tipo, solicitante || null);
   }
 }
 
