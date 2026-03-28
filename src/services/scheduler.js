@@ -76,10 +76,10 @@ async function enviarRelatoriosDiarios() {
     const demandasAtivas = db.prepare(`
       SELECT * FROM demandas
       WHERE responsavel_id = ? AND status NOT IN ('finalizada', 'concluida_aguardando_baixa')
-      ORDER BY data_esperada ASC
+      ORDER BY data_entrega ASC
     `).all(usuario.id);
 
-    const prazo = d => d.data_acordada || d.data_esperada;
+    const prazo = d => d.data_acordada || d.data_entrega;
     const vencidas         = demandasAtivas.filter(d => prazo(d) < hoje);
     const vencem_hoje      = demandasAtivas.filter(d => prazo(d) === hoje);
     const vencem_em_3_dias = demandasAtivas.filter(d => prazo(d) > hoje && prazo(d) <= em3diasStr);
@@ -99,7 +99,7 @@ async function processarLembretes() {
   const hoje = new Date().toISOString().slice(0, 10);
 
   const lembretesPendentes = db.prepare(`
-    SELECT l.*, d.descricao, d.data_esperada, d.data_acordada, d.status,
+    SELECT l.*, d.descricao, d.data_entrega, d.horario_entrega, d.data_acordada, d.status,
            d.responsavel_id, d.solicitante_id
     FROM lembretes l
     JOIN demandas d ON d.id = l.demanda_id
@@ -141,7 +141,8 @@ async function enviarLembrete(lembrete, db) {
   const demanda = {
     id: lembrete.demanda_id,
     descricao: lembrete.descricao,
-    data_esperada: lembrete.data_esperada,
+    data_entrega: lembrete.data_entrega,
+    horario_entrega: lembrete.horario_entrega,
     data_acordada: lembrete.data_acordada,
     status: lembrete.status,
   };
@@ -157,7 +158,7 @@ async function enviarLembrete(lembrete, db) {
     let tipo;
     if (lembrete.tipo === 'antes_vencimento') {
       const diff = Math.round(
-        (new Date(demanda.data_acordada || demanda.data_esperada) - new Date(lembrete.agendado_para))
+        (new Date(demanda.data_acordada || demanda.data_entrega) - new Date(lembrete.agendado_para))
         / (1000 * 60 * 60 * 24)
       );
       tipo = diff >= 3 ? 'antes_vencimento_3' : 'antes_vencimento_1';
@@ -197,7 +198,7 @@ async function verificarPendentesNaoRespondidos() {
   for (const d of pendentes) {
     const responsavel = { id: d.resp_id, nome: d.resp_nome, telefone_whatsapp: d.resp_tel };
     const solicitante = db.prepare('SELECT * FROM usuarios WHERE id = ?').get(d.solicitante_id);
-    const demanda = { id: d.id, descricao: d.descricao, data_esperada: d.data_esperada, data_acordada: d.data_acordada, status: d.status };
+    const demanda = { id: d.id, descricao: d.descricao, data_entrega: d.data_entrega, horario_entrega: d.horario_entrega, data_acordada: d.data_acordada, status: d.status };
     try {
       await whatsappService.enviarLembrete(responsavel, demanda, 'pendente_aceite', solicitante);
     } catch (err) {

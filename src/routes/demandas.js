@@ -50,9 +50,9 @@ router.get('/:id', (req, res) => {
 
 // POST /demandas
 router.post('/', async (req, res) => {
-  const { solicitante_id, responsavel_id, descricao, data_esperada } = req.body;
-  if (!solicitante_id || !responsavel_id || !descricao || !data_esperada) {
-    return res.status(400).json({ erro: 'solicitante_id, responsavel_id, descricao e data_esperada são obrigatórios' });
+  const { solicitante_id, responsavel_id, descricao, data_entrega, horario_entrega } = req.body;
+  if (!solicitante_id || !responsavel_id || !descricao || !data_entrega) {
+    return res.status(400).json({ erro: 'solicitante_id, responsavel_id, descricao e data_entrega são obrigatórios' });
   }
 
   const db = getDb();
@@ -64,21 +64,21 @@ router.post('/', async (req, res) => {
 
   const id = uuidv4();
   db.prepare(`
-    INSERT INTO demandas (id, solicitante_id, responsavel_id, descricao, data_esperada)
-    VALUES (?, ?, ?, ?, ?)
-  `).run(id, solicitante_id, responsavel_id, descricao.trim(), data_esperada);
+    INSERT INTO demandas (id, solicitante_id, responsavel_id, descricao, data_entrega, horario_entrega)
+    VALUES (?, ?, ?, ?, ?, ?)
+  `).run(id, solicitante_id, responsavel_id, descricao.trim(), data_entrega, horario_entrega || null);
 
   // Registra mensagem de criação
   const msgId = uuidv4();
-  const conteudo = `Nova demanda criada por ${solicitante.nome}:\n\n"${descricao}"\n\nPrazo esperado: ${data_esperada}`;
+  const conteudo = `Nova demanda criada por ${solicitante.nome}:\n\n"${descricao}"\n\nPrazo de entrega: ${data_entrega}`;
   db.prepare(`INSERT INTO mensagens (id, demanda_id, remetente_id, tipo, conteudo) VALUES (?, ?, ?, 'criacao', ?)`)
     .run(msgId, id, solicitante_id, conteudo);
 
   // Agenda lembretes para responsável
-  lembreteService.agendarLembretes(id, data_esperada);
+  lembreteService.agendarLembretes(id, data_entrega);
 
   // Notifica responsável via WhatsApp
-  await whatsappService.notificarNovaDeamanda(responsavel, solicitante, { id, descricao, data_esperada });
+  await whatsappService.notificarNovaDeamanda(responsavel, solicitante, { id, descricao, data_entrega, horario_entrega: horario_entrega || null });
 
   const demanda = db.prepare('SELECT * FROM demandas WHERE id = ?').get(id);
   res.status(201).json(demandaComUsuarios(demanda));
@@ -90,7 +90,7 @@ router.put('/:id', async (req, res) => {
   const demanda = db.prepare('SELECT * FROM demandas WHERE id = ?').get(req.params.id);
   if (!demanda) return res.status(404).json({ erro: 'Demanda não encontrada' });
 
-  const campos = ['descricao', 'data_esperada', 'data_acordada', 'status'];
+  const campos = ['descricao', 'data_entrega', 'horario_entrega', 'data_acordada', 'status'];
   const updates = [];
   const values = [];
 
@@ -121,7 +121,7 @@ router.post('/:id/aceitar', async (req, res) => {
     return res.status(400).json({ erro: `Não é possível aceitar uma demanda com status "${demanda.status}"` });
   }
 
-  const dataAcordada = req.body.data_acordada || demanda.data_esperada;
+  const dataAcordada = req.body.data_acordada || demanda.data_entrega;
   db.prepare(`
     UPDATE demandas SET status = 'aceita', data_acordada = ?, atualizado_em = datetime('now') WHERE id = ?
   `).run(dataAcordada, demanda.id);

@@ -38,7 +38,7 @@ function iniciais(nome) {
 }
 
 function prazoInfo(demanda) {
-  const prazo = demanda.data_acordada || demanda.data_esperada;
+  const prazo = demanda.data_acordada || demanda.data_entrega;
   if (!prazo) return '';
   const hoje = new Date().toISOString().slice(0, 10);
   if (demanda.status === 'finalizada') return formatDate(prazo);
@@ -211,7 +211,7 @@ async function abrirModal(id) {
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:.88rem">
           <div><strong>Solicitante:</strong> ${demanda.solicitante?.nome}</div>
           <div><strong>Responsável:</strong> ${demanda.responsavel?.nome}</div>
-          <div><strong>Prazo esperado:</strong> ${formatDate(demanda.data_esperada)}</div>
+          <div><strong>Prazo de entrega:</strong> ${formatDate(demanda.data_entrega)}</div>
           <div><strong>Prazo acordado:</strong> ${formatDate(demanda.data_acordada)}</div>
           <div><strong>Criado em:</strong> ${formatDate(demanda.criado_em)}</div>
           <div><strong>Atualizado:</strong> ${formatDate(demanda.atualizado_em)}</div>
@@ -322,7 +322,7 @@ document.getElementById('form-demanda').addEventListener('submit', async (e) => 
     solicitante_id: document.getElementById('solicitante').value,
     responsavel_id: document.getElementById('responsavel').value,
     descricao: document.getElementById('descricao').value,
-    data_esperada: document.getElementById('data-esperada').value,
+    data_entrega: document.getElementById('data-entrega').value,
   };
   try {
     await api('/api/demandas', { method: 'POST', body });

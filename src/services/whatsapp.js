@@ -119,7 +119,7 @@ async function notificarNovaDeamanda(responsavel, solicitante, demanda) {
     `📋 *Nova Atividade Recebida*\n\n` +
     `De: ${solicitante.nome}\n` +
     `Tarefa: ${demanda.descricao}\n` +
-    `Prazo: ${formatarData(demanda.data_esperada)}\n\n` +
+    `Prazo: ${formatarDataHora(demanda.data_entrega, demanda.horario_entrega)}\n\n` +
     `💬 Falar com ${solicitante.nome.split(' ')[0]}: ${linkWhatsApp(solicitante)}\n` +
     `─────────────────\n` +
     `*Responda com:*\n` +
@@ -189,7 +189,7 @@ async function notificarImpedimento(solicitante, responsavel, demanda, descricao
 }
 
 async function enviarLembrete(destinatario, demanda, tipoLembrete, solicitante = null) {
-  const prazo = formatarData(demanda.data_acordada || demanda.data_esperada);
+  const prazo = formatarDataHora(demanda.data_acordada || demanda.data_entrega, demanda.horario_entrega);
 
   const linkSolicitante = solicitante
     ? `\n💬 Falar com ${solicitante.nome.split(' ')[0]}: ${linkWhatsApp(solicitante)}`
@@ -256,7 +256,7 @@ async function enviarRelatorioDiario(usuario, { vencidas, vencem_hoje, vencem_em
 
     if (vencidas.length > 0) {
       msg += `🔴 *Vencidas (${vencidas.length}):*\n`;
-      for (const d of vencidas) msg += `• ${d.descricao.substring(0, 40)} — ${formatarData(d.data_acordada || d.data_esperada)}\n`;
+      for (const d of vencidas) msg += `• ${d.descricao.substring(0, 40)} — ${formatarDataHora(d.data_acordada || d.data_entrega, d.horario_entrega)}\n`;
       msg += '\n';
     }
     if (vencem_hoje.length > 0) {
@@ -266,7 +266,7 @@ async function enviarRelatorioDiario(usuario, { vencidas, vencem_hoje, vencem_em
     }
     if (vencem_em_3_dias.length > 0) {
       msg += `🟠 *Vencem em até 3 dias (${vencem_em_3_dias.length}):*\n`;
-      for (const d of vencem_em_3_dias) msg += `• ${d.descricao.substring(0, 40)} — ${formatarData(d.data_acordada || d.data_esperada)}\n`;
+      for (const d of vencem_em_3_dias) msg += `• ${d.descricao.substring(0, 40)} — ${formatarDataHora(d.data_acordada || d.data_entrega, d.horario_entrega)}\n`;
       msg += '\n';
     }
   }
@@ -280,6 +280,12 @@ function formatarData(iso) {
   if (!iso) return '—';
   const [y, m, d] = iso.slice(0, 10).split('-');
   return `${d}/${m}/${y}`;
+}
+
+function formatarDataHora(dataIso, horario) {
+  if (!dataIso) return '—';
+  const [y, m, d] = dataIso.slice(0, 10).split('-');
+  return horario ? `${d}/${m}/${y} às ${horario}` : `${d}/${m}/${y}`;
 }
 
 module.exports = {

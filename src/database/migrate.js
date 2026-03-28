@@ -24,7 +24,8 @@ db.exec(`
     solicitante_id TEXT NOT NULL REFERENCES usuarios(id),
     responsavel_id TEXT NOT NULL REFERENCES usuarios(id),
     descricao TEXT NOT NULL,
-    data_esperada TEXT NOT NULL,
+    data_entrega TEXT NOT NULL,
+    horario_entrega TEXT,
     data_acordada TEXT,
     status TEXT NOT NULL DEFAULT 'pendente_aceite'
       CHECK(status IN (

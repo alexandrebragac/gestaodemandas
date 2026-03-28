@@ -19,7 +19,7 @@ db.exec(`
     solicitante_id TEXT NOT NULL REFERENCES usuarios(id),
     responsavel_id TEXT NOT NULL REFERENCES usuarios(id),
     descricao TEXT NOT NULL,
-    data_esperada TEXT NOT NULL,
+    data_entrega TEXT NOT NULL,
     data_acordada TEXT,
     status TEXT NOT NULL DEFAULT 'pendente_aceite'
       CHECK(status IN ('pendente_aceite','em_negociacao','aceita','em_andamento','concluida_aguardando_baixa','finalizada')),
@@ -47,6 +47,11 @@ db.exec(`
     atualizado_em TEXT NOT NULL DEFAULT (datetime('now'))
   );
 `);
+
+// Migration: rename data_esperada → data_entrega
+try { db.prepare('ALTER TABLE demandas RENAME COLUMN data_esperada TO data_entrega').run(); console.log('[Migration] Coluna data_esperada → data_entrega'); } catch (_) {}
+// Migration: add horario_entrega
+try { db.prepare('ALTER TABLE demandas ADD COLUMN horario_entrega TEXT').run(); console.log('[Migration] Adicionada coluna horario_entrega'); } catch (_) {}
 
 // Insere configurações padrão se ainda não existirem
 const defaults = {

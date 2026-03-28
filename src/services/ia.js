@@ -32,7 +32,7 @@ async function responderPergunta(usuario, pergunta) {
     FROM demandas d
     JOIN usuarios u ON u.id = d.solicitante_id
     WHERE d.responsavel_id = ?
-    ORDER BY d.data_esperada ASC
+    ORDER BY d.data_entrega ASC
   `).all(usuario.id);
 
   const comoSolicitante = db.prepare(`
@@ -40,14 +40,14 @@ async function responderPergunta(usuario, pergunta) {
     FROM demandas d
     JOIN usuarios u ON u.id = d.responsavel_id
     WHERE d.solicitante_id = ?
-    ORDER BY d.data_esperada ASC
+    ORDER BY d.data_entrega ASC
   `).all(usuario.id);
 
   const listar = (lista, nomeCampo) =>
     lista.length === 0
       ? 'Nenhuma'
       : lista.map(d =>
-          `  • "${d.descricao}" | ${nomeCampo}: ${d[nomeCampo + '_nome']} | Prazo: ${formatarDataIso(d.data_acordada || d.data_esperada)} | Status: ${traduzirStatus(d.status)}`
+          `  • "${d.descricao}" | ${nomeCampo}: ${d[nomeCampo + '_nome']} | Prazo: ${formatarDataIso(d.data_acordada || d.data_entrega)} | Status: ${traduzirStatus(d.status)}`
         ).join('\n');
 
   const contexto =

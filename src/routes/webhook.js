@@ -72,7 +72,7 @@ router.post('/whatsapp', async (req, res) => {
 
 // Fluxos que esperam texto livre ou data (não seleção de lista por número)
 const FLUXOS_TEXTO = new Set([
-  'criar_descricao', 'criar_prazo',
+  'criar_descricao', 'criar_prazo', 'criar_horario',
   'editar_nova_descricao', 'editar_novo_prazo',
   'aguardando_data_prazo', 'aguardando_justificativa_prazo', 'aguardando_impedimento',
 ]);
@@ -111,6 +111,7 @@ async function continuarFluxo(usuario, texto, comando, parametros, sessao, telef
     case 'criar_descricao':       await fluxoCriarDescricao(usuario, texto, telefone, res); break;
     case 'criar_responsavel':     await fluxoCriarResponsavel(usuario, texto, comando, parametros, sessao, telefone, res); break;
     case 'criar_prazo':           await fluxoCriarPrazo(usuario, texto, comando, parametros, sessao, telefone, res); break;
+    case 'criar_horario':         await fluxoCriarHorario(usuario, texto, sessao, telefone, res); break;
     case 'criar_confirmacao':     await fluxoCriarConfirmacao(usuario, texto, comando, parametros, sessao, telefone, res); break;
     case 'editar_selecionar':     await fluxoEditarSelecionar(usuario, texto, comando, parametros, sessao, telefone, res); break;
     case 'editar_campo':          await fluxoEditarCampo(usuario, texto, comando, parametros, sessao, telefone, res); break;
@@ -208,12 +209,36 @@ async function fluxoCriarPrazo(usuario, texto, comando, parametros, sessao, tele
     return res.status(200).send('OK');
   }
 
-  setSessao(telefone, { ...sessao, fluxo: 'criar_confirmacao', data_esperada: data });
+  const perguntaHorario = `⏰ *Horário de entrega?*\n\nEx: *14:00* ou *09:30*\n\n*0* — Sem horário definido`;
+  setSessao(telefone, { ...sessao, fluxo: 'criar_horario', data_entrega: data, pergunta_atual: perguntaHorario });
+  await whatsappService.enviarMensagem(usuario, perguntaHorario);
+  res.status(200).send('OK');
+}
+
+async function fluxoCriarHorario(usuario, texto, sessao, telefone, res) {
+  let horario = null;
+  if (texto !== '0') {
+    const match = texto.match(/^(\d{1,2}):(\d{2})$/);
+    if (match) {
+      const h = parseInt(match[1]);
+      const m = parseInt(match[2]);
+      if (h >= 0 && h <= 23 && m >= 0 && m <= 59) {
+        horario = `${String(h).padStart(2,'0')}:${match[2]}`;
+      }
+    }
+    if (!horario && texto !== '0') {
+      await whatsappService.enviarMensagem(usuario, `❓ Use o formato *HH:MM* — ex: 14:00\n\n*0* — Sem horário`);
+      return res.status(200).send('OK');
+    }
+  }
+
+  setSessao(telefone, { ...sessao, fluxo: 'criar_confirmacao', horario_entrega: horario });
+  const prazoFormatado = formatarDataHora(sessao.data_entrega, horario);
   await whatsappService.enviarMensagem(usuario,
     `✅ *Confirmar criação?*\n\n` +
     `📋 Tarefa: ${sessao.descricao}\n` +
     `👤 Responsável: ${sessao.responsavel.nome}\n` +
-    `📅 Prazo: ${formatarData(data)}\n\n` +
+    `📅 Entrega: ${prazoFormatado}\n\n` +
     `*1* — Confirmar e criar\n` +
     `*0* — Cancelar`
   );
@@ -232,17 +257,17 @@ async function fluxoCriarConfirmacao(usuario, texto, comando, parametros, sessao
 
   const db = getDb();
   const id = uuidv4();
-  db.prepare(`INSERT INTO demandas (id, solicitante_id, responsavel_id, descricao, data_esperada) VALUES (?, ?, ?, ?, ?)`)
-    .run(id, usuario.id, sessao.responsavel.id, sessao.descricao.trim(), sessao.data_esperada);
+  db.prepare(`INSERT INTO demandas (id, solicitante_id, responsavel_id, descricao, data_entrega, horario_entrega) VALUES (?, ?, ?, ?, ?, ?)`)
+    .run(id, usuario.id, sessao.responsavel.id, sessao.descricao.trim(), sessao.data_entrega, sessao.horario_entrega || null);
 
   db.prepare(`INSERT INTO mensagens (id, demanda_id, remetente_id, tipo, conteudo) VALUES (?, ?, ?, 'criacao', ?)`)
-    .run(uuidv4(), id, usuario.id, `Nova demanda criada por ${usuario.nome}:\n\n"${sessao.descricao}"\n\nPrazo esperado: ${sessao.data_esperada}`);
+    .run(uuidv4(), id, usuario.id, `Nova demanda criada por ${usuario.nome}:\n\n"${sessao.descricao}"\n\nPrazo de entrega: ${sessao.data_entrega}${sessao.horario_entrega ? ` às ${sessao.horario_entrega}` : ''}`);
 
-  lembreteService.agendarLembretes(id, sessao.data_esperada);
+  lembreteService.agendarLembretes(id, sessao.data_entrega);
 
   const responsavelCompleto = db.prepare('SELECT * FROM usuarios WHERE id = ?').get(sessao.responsavel.id);
   await whatsappService.notificarNovaDeamanda(responsavelCompleto, usuario, {
-    id, descricao: sessao.descricao, data_esperada: sessao.data_esperada,
+    id, descricao: sessao.descricao, data_entrega: sessao.data_entrega, horario_entrega: sessao.horario_entrega || null,
   });
 
   clearSessao(telefone);
@@ -250,7 +275,7 @@ async function fluxoCriarConfirmacao(usuario, texto, comando, parametros, sessao
     `🎉 *Demanda criada com sucesso!*\n\n` +
     `📋 ${sessao.descricao}\n` +
     `👤 Responsável: ${sessao.responsavel.nome}\n` +
-    `📅 Prazo: ${formatarData(sessao.data_esperada)}\n\n` +
+    `📅 Entrega: ${formatarDataHora(sessao.data_entrega, sessao.horario_entrega)}\n\n` +
     `${sessao.responsavel.nome} foi notificado(a).`
   );
   res.status(200).send('OK');
@@ -277,7 +302,7 @@ async function iniciarEdicaoDemanda(usuario, telefone, res) {
 
   let msg = `✏️ *Editar Demanda*\n\nQual demanda deseja editar?\n\n`;
   demandas.forEach((d, i) => {
-    const prazo = formatarData(d.data_acordada || d.data_esperada);
+    const prazo = formatarData(d.data_acordada || d.data_entrega);
     msg += `*${i + 1}* — ${d.descricao.substring(0, 40)} (${prazo})\n`;
   });
   msg += `\n*0* — Cancelar`;
@@ -319,7 +344,7 @@ async function fluxoEditarCampo(usuario, texto, comando, parametros, sessao, tel
     setSessao(telefone, { ...sessao, fluxo: 'editar_nova_descricao', pergunta_atual: perguntaDesc });
     await whatsappService.enviarMensagem(usuario, perguntaDesc);
   } else if (num === 2) {
-    const prazoAtual = formatarData(sessao.demanda.data_acordada || sessao.demanda.data_esperada);
+    const prazoAtual = formatarData(sessao.demanda.data_acordada || sessao.demanda.data_entrega);
     const perguntaNovoPrazo = `📅 *Novo prazo* (*DD/MM/AAAA*):\n\n_Atual: ${prazoAtual}_\n\n*0* — Cancelar`;
     setSessao(telefone, { ...sessao, fluxo: 'editar_novo_prazo', pergunta_atual: perguntaNovoPrazo });
     await whatsappService.enviarMensagem(usuario, perguntaNovoPrazo);
@@ -338,7 +363,7 @@ async function fluxoEditarNovaDescricao(usuario, texto, sessao, telefone, res) {
 
   const responsavel = db.prepare('SELECT * FROM usuarios WHERE id = ?').get(sessao.demanda.responsavel_id);
   await whatsappService.enviarMensagem(responsavel,
-    `✏️ *Demanda atualizada*\n\n${usuario.nome} alterou a descrição:\n"${texto.trim()}"\nPrazo: ${formatarData(sessao.demanda.data_acordada || sessao.demanda.data_esperada)}`
+    `✏️ *Demanda atualizada*\n\n${usuario.nome} alterou a descrição:\n"${texto.trim()}"\nPrazo: ${formatarData(sessao.demanda.data_acordada || sessao.demanda.data_entrega)}`
   );
 
   clearSessao(telefone);
@@ -351,7 +376,7 @@ async function fluxoEditarNovoPrazo(usuario, texto, comando, parametros, sessao,
 
   const data = extrairData(texto, comando, parametros);
   if (!data) {
-    const prazoAtual = formatarData(sessao.demanda.data_acordada || sessao.demanda.data_esperada);
+    const prazoAtual = formatarData(sessao.demanda.data_acordada || sessao.demanda.data_entrega);
     await whatsappService.enviarMensagem(usuario,
       `❓ Data inválida. Use *DD/MM/AAAA*\nEx: 30/04/2026\n\n` +
       `📅 *Novo prazo para:* "${sessao.demanda.descricao.substring(0, 40)}"\n_Atual: ${prazoAtual}_\n_Digite a data ou *0* para cancelar._`
@@ -360,7 +385,7 @@ async function fluxoEditarNovoPrazo(usuario, texto, comando, parametros, sessao,
   }
 
   const db = getDb();
-  db.prepare(`UPDATE demandas SET data_esperada = ?, data_acordada = ?, status = 'em_negociacao', atualizado_em = datetime('now') WHERE id = ?`)
+  db.prepare(`UPDATE demandas SET data_entrega = ?, data_acordada = ?, status = 'em_negociacao', atualizado_em = datetime('now') WHERE id = ?`)
     .run(data, data, sessao.demanda.id);
 
   db.prepare('DELETE FROM lembretes WHERE demanda_id = ? AND enviado = 0').run(sessao.demanda.id);
@@ -420,11 +445,11 @@ async function handleStatus(usuario, res) {
   const db = getDb();
 
   const comoResponsavel = db.prepare(`
-    SELECT * FROM demandas WHERE responsavel_id = ? AND status NOT IN ('finalizada') ORDER BY data_esperada ASC
+    SELECT * FROM demandas WHERE responsavel_id = ? AND status NOT IN ('finalizada') ORDER BY data_entrega ASC
   `).all(usuario.id);
 
   const comoSolicitante = db.prepare(`
-    SELECT * FROM demandas WHERE solicitante_id = ? AND status NOT IN ('finalizada') ORDER BY data_esperada ASC
+    SELECT * FROM demandas WHERE solicitante_id = ? AND status NOT IN ('finalizada') ORDER BY data_entrega ASC
   `).all(usuario.id);
 
   let msg = `📊 *Suas Demandas*\n\n`;
@@ -432,7 +457,7 @@ async function handleStatus(usuario, res) {
   if (comoResponsavel.length > 0) {
     msg += `*Você é responsável (${comoResponsavel.length}):*\n`;
     for (const d of comoResponsavel) {
-      msg += `• ${d.descricao.substring(0, 45)} — ${statusEmoji(d.status)} ${formatarData(d.data_acordada || d.data_esperada)}\n`;
+      msg += `• ${d.descricao.substring(0, 45)} — ${statusEmoji(d.status)} ${formatarData(d.data_acordada || d.data_entrega)}\n`;
     }
     msg += '\n';
   }
@@ -441,7 +466,7 @@ async function handleStatus(usuario, res) {
     msg += `*Você solicitou (${comoSolicitante.length}):*\n`;
     for (const d of comoSolicitante) {
       const resp = db.prepare('SELECT nome FROM usuarios WHERE id = ?').get(d.responsavel_id);
-      msg += `• ${d.descricao.substring(0, 35)} (${resp?.nome?.split(' ')[0]}) — ${statusEmoji(d.status)} ${formatarData(d.data_acordada || d.data_esperada)}\n`;
+      msg += `• ${d.descricao.substring(0, 35)} (${resp?.nome?.split(' ')[0]}) — ${statusEmoji(d.status)} ${formatarData(d.data_acordada || d.data_entrega)}\n`;
     }
     msg += '\n';
   }
@@ -478,7 +503,7 @@ async function handleAceitar(usuario, telefone, res) {
     return res.status(200).send('OK');
   }
 
-  const dataAcordada = demanda.data_acordada || demanda.data_esperada;
+  const dataAcordada = demanda.data_acordada || demanda.data_entrega;
   db.prepare(`UPDATE demandas SET status='aceita', data_acordada=?, atualizado_em=datetime('now') WHERE id=?`)
     .run(dataAcordada, demanda.id);
 
@@ -560,7 +585,7 @@ async function handleNovoPrazoComData(usuario, demandaId, novaData, telefone, re
 
 async function handleConcluir(usuario, telefone, res) {
   const db = getDb();
-  const demanda = db.prepare(`SELECT * FROM demandas WHERE responsavel_id=? AND status IN ('aceita','em_andamento') ORDER BY data_esperada ASC LIMIT 1`).get(usuario.id);
+  const demanda = db.prepare(`SELECT * FROM demandas WHERE responsavel_id=? AND status IN ('aceita','em_andamento') ORDER BY data_entrega ASC LIMIT 1`).get(usuario.id);
 
   if (!demanda) {
     await whatsappService.enviarMensagem(usuario, 'Nenhuma atividade em andamento.');
@@ -634,7 +659,7 @@ async function iniciarImpedimento(usuario, telefone, res) {
   const demandas = db.prepare(`
     SELECT * FROM demandas
     WHERE responsavel_id = ? AND status IN ('pendente_aceite','aceita','em_andamento')
-    ORDER BY data_esperada ASC
+    ORDER BY data_entrega ASC
   `).all(usuario.id);
 
   if (demandas.length === 0) {
@@ -735,6 +760,12 @@ function formatarData(iso) {
   if (!iso) return '—';
   const [y, m, d] = iso.slice(0, 10).split('-');
   return `${d}/${m}/${y}`;
+}
+
+function formatarDataHora(dataIso, horario) {
+  if (!dataIso) return '—';
+  const [y, m, d] = dataIso.slice(0, 10).split('-');
+  return horario ? `${d}/${m}/${y} às ${horario}` : `${d}/${m}/${y}`;
 }
 
 module.exports = router;
