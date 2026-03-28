@@ -2,6 +2,25 @@ const API = '';
 
 // ── Utilitários ──────────────────────────────────────────────────────────────
 
+function gerarLinkCalendario(descricao, dataIso, horario) {
+  if (!dataIso) return null;
+  const titulo = encodeURIComponent(descricao.substring(0, 80));
+  const detalhes = encodeURIComponent('Prazo de atividade — Gestão de Demandas');
+  if (horario) {
+    const base = dataIso.slice(0, 10).replace(/-/g, '');
+    const [h, m] = horario.split(':');
+    const hInicio = `${String(h).padStart(2,'0')}${String(m).padStart(2,'0')}00`;
+    const hFim = `${String(parseInt(h)+1).padStart(2,'0')}${String(m).padStart(2,'0')}00`;
+    return `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${titulo}&dates=${base}T${hInicio}/${base}T${hFim}&details=${detalhes}&ctz=America%2FSao_Paulo`;
+  } else {
+    const base = dataIso.slice(0, 10).replace(/-/g, '');
+    const d = new Date(dataIso.slice(0,10) + 'T12:00:00Z');
+    d.setUTCDate(d.getUTCDate() + 1);
+    const proximo = d.toISOString().slice(0,10).replace(/-/g,'');
+    return `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${titulo}&dates=${base}/${proximo}&details=${detalhes}`;
+  }
+}
+
 async function api(path, options = {}) {
   const res = await fetch(API + path, {
     headers: { 'Content-Type': 'application/json' },
@@ -217,6 +236,17 @@ async function abrirModal(id) {
           <div><strong>Atualizado:</strong> ${formatDate(demanda.atualizado_em)}</div>
         </div>
       </div>
+
+      ${(() => {
+        const prazoData = demanda.data_acordada || demanda.data_entrega;
+        const link = gerarLinkCalendario(demanda.descricao, prazoData, demanda.horario_entrega);
+        return link ? `<div style="margin:8px 0 4px">
+          <a href="${link}" target="_blank" rel="noopener"
+            style="display:inline-flex;align-items:center;gap:6px;font-size:.85rem;color:#1a73e8;text-decoration:none;font-weight:500">
+            📅 Adicionar ao Google Agenda
+          </a>
+        </div>` : '';
+      })()}
 
       <div class="modal-section">
         <h3>Histórico</h3>
