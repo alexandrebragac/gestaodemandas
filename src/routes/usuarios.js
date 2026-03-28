@@ -68,17 +68,39 @@ router.delete('/:id', (req, res) => {
   const usuario = db.prepare('SELECT * FROM usuarios WHERE id = ?').get(req.params.id);
   if (!usuario) return res.status(404).json({ erro: 'Usuário não encontrado' });
 
-  const demandas = db.prepare(
-    'SELECT COUNT(*) as total FROM demandas WHERE solicitante_id = ? OR responsavel_id = ?'
-  ).get(req.params.id, req.params.id);
+  // Bloqueia exclusão se houver demandas ATIVAS (não finalizadas)
+  const { total: ativas } = db.prepare(`
+    SELECT COUNT(*) as total FROM demandas
+    WHERE (solicitante_id = ? OR responsavel_id = ?) AND status != 'finalizada'
+  `).get(req.params.id, req.params.id);
 
-  if (demandas.total > 0) {
+  if (ativas > 0) {
     return res.status(409).json({
-      erro: `Não é possível excluir "${usuario.nome}" pois possui ${demandas.total} demanda(s) vinculada(s). Finalize ou reatribua as demandas antes de excluir.`
+      erro: `Não é possível excluir "${usuario.nome}" pois possui ${ativas} demanda(s) ativa(s). Finalize todas as demandas antes de excluir.`
     });
   }
 
-  db.prepare('DELETE FROM usuarios WHERE id = ?').run(req.params.id);
+  // Cascade delete: remove todos os dados vinculados antes de excluir o usuário
+  const excluirTudo = db.transaction(() => {
+    // IDs de demandas finalizadas onde o usuário participou
+    const demandaIds = db.prepare(`
+      SELECT id FROM demandas WHERE solicitante_id = ? OR responsavel_id = ?
+    `).all(req.params.id, req.params.id).map(d => d.id);
+
+    for (const demandaId of demandaIds) {
+      db.prepare('DELETE FROM lembretes WHERE demanda_id = ?').run(demandaId);
+      db.prepare('DELETE FROM mensagens WHERE demanda_id = ?').run(demandaId);
+    }
+    db.prepare('DELETE FROM demandas WHERE solicitante_id = ? OR responsavel_id = ?')
+      .run(req.params.id, req.params.id);
+
+    // Remove mensagens avulsas do usuário (ex: mensagens em demandas de outros)
+    db.prepare('DELETE FROM mensagens WHERE remetente_id = ?').run(req.params.id);
+
+    db.prepare('DELETE FROM usuarios WHERE id = ?').run(req.params.id);
+  });
+
+  excluirTudo();
   res.status(204).end();
 });
 
