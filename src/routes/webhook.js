@@ -12,55 +12,61 @@ const router = express.Router();
 // ── Entry point ───────────────────────────────────────────────────────────────
 
 router.post('/whatsapp', async (req, res) => {
-  const { From, Body } = req.body;
-  if (!From || !Body) return res.status(400).send('Campos obrigatórios ausentes');
+  // Sempre retorna 200 para o Twilio — erros são logados mas não travam o webhook
+  try {
+    const { From, Body } = req.body;
+    if (!From || !Body) return res.status(200).send('OK');
 
-  const telefone = From.replace('whatsapp:', '');
-  const texto = Body.trim();
-  console.log(`[Webhook] ${telefone}: "${texto}"`);
+    const telefone = From.replace('whatsapp:', '');
+    const texto = Body.trim();
+    console.log(`[Webhook] ${telefone}: "${texto}"`);
 
-  const db = getDb();
-  const usuario = db.prepare('SELECT * FROM usuarios WHERE telefone_whatsapp = ?').get(telefone);
+    const db = getDb();
+    const usuario = db.prepare('SELECT * FROM usuarios WHERE telefone_whatsapp = ?').get(telefone);
 
-  if (!usuario) {
-    await whatsappService.enviarMensagem(
-      { telefone_whatsapp: telefone },
-      '❌ Seu número não está cadastrado no sistema. Fale com o administrador.'
-    );
-    return res.status(200).send('OK');
-  }
+    if (!usuario) {
+      await whatsappService.enviarMensagem(
+        { telefone_whatsapp: telefone },
+        '❌ Seu número não está cadastrado no sistema. Fale com o administrador.'
+      );
+      return res.status(200).send('OK');
+    }
 
-  const sessao = getSessao(telefone);
-  const { comando, parametros } = parsear(texto);
+    const sessao = getSessao(telefone);
+    const { comando, parametros } = parsear(texto);
 
-  // ── Fluxos multi-etapa ativos ─────────────────────────────────────────────
+    // ── Fluxos multi-etapa ativos ───────────────────────────────────────────
 
-  if (sessao?.fluxo) {
-    await continuarFluxo(usuario, texto, comando, parametros, sessao, telefone, res);
-    return;
-  }
-
-  // ── Número do menu sem fluxo ativo ────────────────────────────────────────
-
-  if (comando === COMANDOS.NUMERO_MENU) {
-    await handleNumeroMenu(usuario, parametros.numero, null, telefone, res);
-    return;
-  }
-
-  // ── Comandos de texto ─────────────────────────────────────────────────────
-
-  switch (comando) {
-    case COMANDOS.STATUS:       await handleStatus(usuario, res); break;
-    case COMANDOS.AJUDA:        await whatsappService.enviarMensagem(usuario, mensagemAjuda()); res.status(200).send('OK'); break;
-    case COMANDOS.ACEITAR:      await handleAceitar(usuario, telefone, res); break;
-    case COMANDOS.NOVO_PRAZO:   await handleNovoPrazoComData(usuario, null, parametros?.data, telefone, res); break;
-    case COMANDOS.CONCLUIR:     await handleConcluir(usuario, telefone, res); break;
-    case COMANDOS.BAIXA:        await handleBaixa(usuario, telefone, res); break;
-    case COMANDOS.NOVA_DEMANDA: await iniciarCriacaoDemanda(usuario, telefone, res); break;
-    case COMANDOS.EDITAR_DEMANDA: await iniciarEdicaoDemanda(usuario, telefone, res); break;
-    default:
-      await handlePerguntaIA(usuario, texto, res);
+    if (sessao?.fluxo) {
+      await continuarFluxo(usuario, texto, comando, parametros, sessao, telefone, res);
       return;
+    }
+
+    // ── Número do menu sem fluxo ativo ──────────────────────────────────────
+
+    if (comando === COMANDOS.NUMERO_MENU) {
+      await handleNumeroMenu(usuario, parametros.numero, null, telefone, res);
+      return;
+    }
+
+    // ── Comandos de texto ───────────────────────────────────────────────────
+
+    switch (comando) {
+      case COMANDOS.STATUS:         await handleStatus(usuario, res); break;
+      case COMANDOS.AJUDA:          await whatsappService.enviarMensagem(usuario, mensagemAjuda()); res.status(200).send('OK'); break;
+      case COMANDOS.ACEITAR:        await handleAceitar(usuario, telefone, res); break;
+      case COMANDOS.NOVO_PRAZO:     await handleNovoPrazoComData(usuario, null, parametros?.data, telefone, res); break;
+      case COMANDOS.CONCLUIR:       await handleConcluir(usuario, telefone, res); break;
+      case COMANDOS.BAIXA:          await handleBaixa(usuario, telefone, res); break;
+      case COMANDOS.NOVA_DEMANDA:   await iniciarCriacaoDemanda(usuario, telefone, res); break;
+      case COMANDOS.EDITAR_DEMANDA: await iniciarEdicaoDemanda(usuario, telefone, res); break;
+      default:
+        await handlePerguntaIA(usuario, texto, res);
+        return;
+    }
+  } catch (err) {
+    console.error('[Webhook] Erro não tratado:', err.message, err.stack);
+    if (!res.headersSent) res.status(200).send('OK');
   }
 });
 
@@ -84,6 +90,7 @@ function gerarLinkCalendario(descricao, dataIso) {
 // ── Roteador de fluxos ativos ─────────────────────────────────────────────────
 
 async function continuarFluxo(usuario, texto, comando, parametros, sessao, telefone, res) {
+  try {
   // Interceção: usuário digitou um comando de menu (número) enquanto está em um
   // fluxo que espera texto livre. Reenvia a pergunta atual para não perder o contexto.
   if (
@@ -123,8 +130,14 @@ async function continuarFluxo(usuario, texto, comando, parametros, sessao, telef
     }
     default:
       clearSessao(telefone);
-      await whatsappService.enviarMensagem(usuario, 'Sessão expirada. Digite *6* para ver os comandos.');
+      await whatsappService.enviarMensagem(usuario, 'Sessão expirada. Use os comandos abaixo.');
       res.status(200).send('OK');
+  }
+  } catch (err) {
+    console.error('[Webhook] Erro em continuarFluxo:', err.message, err.stack);
+    clearSessao(telefone);
+    try { await whatsappService.enviarMensagem(usuario, '⚠️ Ocorreu um erro. Tente novamente.'); } catch (_) {}
+    if (!res.headersSent) res.status(200).send('OK');
   }
 }
 
