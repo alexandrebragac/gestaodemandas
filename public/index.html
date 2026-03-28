@@ -14,9 +14,9 @@
     </div>
   </header>
 
-  <nav style="display:flex;gap:4px;padding:0 24px;background:var(--green-dark)">
-    <a href="/" style="padding:10px 20px;color:#fff;font-size:.9rem;font-weight:600;border-bottom:3px solid #fff;text-decoration:none">Dashboard</a>
-    <a href="/configuracoes.html" style="padding:10px 20px;color:rgba(255,255,255,.7);font-size:.9rem;font-weight:500;border-bottom:3px solid transparent;text-decoration:none">⚙️ Configurações</a>
+  <nav class="nav-tabs">
+    <a href="/" class="nav-tab active">Dashboard</a>
+    <a href="/configuracoes.html" class="nav-tab">⚙️ Configurações</a>
   </nav>
 
   <main>
@@ -100,7 +100,7 @@
     <div id="modal-usuario" class="modal hidden">
       <div class="modal-content" style="max-width:400px">
         <button class="modal-close" onclick="document.getElementById('modal-usuario').classList.add('hidden')">✕</button>
-        <h2 style="margin-bottom:16px;color:var(--green-dark)">Editar Usuário</h2>
+        <h2 style="margin-bottom:16px;color:var(--accent)">Editar Usuário</h2>
         <form id="form-editar-usuario">
           <input type="hidden" id="edit-usuario-id" />
           <label>Nome
