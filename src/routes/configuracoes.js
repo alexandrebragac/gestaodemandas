@@ -24,6 +24,8 @@ router.put('/', (req, res) => {
     'frequencia_apos_vencimento',
     'alerta_aguardando_baixa',
     'frequencia_aguardando_baixa',
+    'alerta_pendente_sem_resposta',
+    'intervalo_alerta_pendente_horas',
   ];
 
   const update = db.prepare(`

@@ -144,6 +144,30 @@
         </div>
       </div>
 
+      <!-- Alertas de Demanda Sem Resposta -->
+      <div class="config-card">
+        <h2>⏰ Alerta de Sem Resposta</h2>
+        <p style="font-size:.82rem;color:var(--muted);margin-bottom:12px">Lembrete enviado ao responsável quando não aceita/recusa uma atividade</p>
+
+        <div class="config-row">
+          <div class="config-label">
+            Ativar lembrete horário
+            <small>Envia alerta enquanto a atividade estiver sem resposta</small>
+          </div>
+          <label class="toggle">
+            <input type="checkbox" id="alerta_pendente_sem_resposta" />
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+
+        <div class="config-row">
+          <div class="config-label">
+            Intervalo entre alertas
+            <small>Repetir a cada <input type="number" id="intervalo_alerta_pendente_horas" class="input-small" min="1" max="24" value="1" /> hora(s)</small>
+          </div>
+        </div>
+      </div>
+
       <!-- Resumo / Salvar -->
       <div class="config-card">
         <h2>💾 Salvar Configurações</h2>
@@ -188,6 +212,8 @@
       document.getElementById('frequencia_apos_vencimento').value = cfg.frequencia_apos_vencimento || '1';
       document.getElementById('alerta_aguardando_baixa').checked = cfg.alerta_aguardando_baixa === '1';
       document.getElementById('frequencia_aguardando_baixa').value = cfg.frequencia_aguardando_baixa || '2';
+      document.getElementById('alerta_pendente_sem_resposta').checked = cfg.alerta_pendente_sem_resposta === '1';
+      document.getElementById('intervalo_alerta_pendente_horas').value = cfg.intervalo_alerta_pendente_horas || '1';
       atualizarPreview(cfg);
     }
 
@@ -217,6 +243,8 @@
         frequencia_apos_vencimento: document.getElementById('frequencia_apos_vencimento').value,
         alerta_aguardando_baixa: document.getElementById('alerta_aguardando_baixa').checked ? '1' : '0',
         frequencia_aguardando_baixa: document.getElementById('frequencia_aguardando_baixa').value,
+        alerta_pendente_sem_resposta: document.getElementById('alerta_pendente_sem_resposta').checked ? '1' : '0',
+        intervalo_alerta_pendente_horas: document.getElementById('intervalo_alerta_pendente_horas').value,
       };
       try {
         await api('/api/configuracoes', { method: 'PUT', body });

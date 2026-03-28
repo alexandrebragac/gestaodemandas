@@ -58,6 +58,8 @@ const defaults = {
   frequencia_apos_vencimento: '1',
   alerta_aguardando_baixa: '1',
   frequencia_aguardando_baixa: '2',
+  alerta_pendente_sem_resposta: '0',
+  intervalo_alerta_pendente_horas: '1',
 };
 const insertCfg = db.prepare('INSERT OR IGNORE INTO configuracoes (chave, valor) VALUES (?, ?)');
 for (const [chave, valor] of Object.entries(defaults)) insertCfg.run(chave, valor);
