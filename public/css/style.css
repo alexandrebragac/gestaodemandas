@@ -62,6 +62,8 @@ details summary { cursor: pointer; font-size: .85rem; color: var(--green-dark); 
 .user-list { list-style: none; }
 .user-list li { display: flex; align-items: center; gap: 8px; padding: 6px 0; border-bottom: 1px solid var(--border); font-size: .85rem; }
 .user-list li:last-child { border-bottom: none; }
+.btn-user-action { background: none; border: none; cursor: pointer; font-size: .9rem; padding: 2px 4px; border-radius: 4px; opacity: .6; }
+.btn-user-action:hover { opacity: 1; background: var(--border); }
 .user-avatar { width: 30px; height: 30px; border-radius: 50%; background: var(--green); color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: .8rem; flex-shrink: 0; }
 
 /* FILTER BAR */

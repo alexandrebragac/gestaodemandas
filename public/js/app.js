@@ -88,12 +88,47 @@ function renderUsuarios() {
   ul.innerHTML = usuarios.map(u => `
     <li>
       <div class="user-avatar">${iniciais(u.nome)}</div>
-      <div>
+      <div style="flex:1">
         <div style="font-weight:500">${u.nome}</div>
         <div style="color:var(--muted);font-size:.75rem">${u.telefone_whatsapp}</div>
       </div>
+      <div style="display:flex;gap:4px">
+        <button class="btn-user-action" title="Editar" onclick="abrirEdicaoUsuario('${u.id}')">✏️</button>
+        <button class="btn-user-action" title="Excluir" onclick="excluirUsuario('${u.id}', '${u.nome}')">🗑️</button>
+      </div>
     </li>
   `).join('');
+}
+
+async function abrirEdicaoUsuario(id) {
+  const u = usuarios.find(x => x.id === id);
+  if (!u) return;
+
+  const novoNome = prompt('Nome:', u.nome);
+  if (novoNome === null) return;
+
+  const novoTel = prompt('Telefone (com DDI, ex: +5585999990001):', u.telefone_whatsapp);
+  if (novoTel === null) return;
+
+  try {
+    await api(`/api/usuarios/${id}`, {
+      method: 'PUT',
+      body: { nome: novoNome.trim(), telefone_whatsapp: novoTel.trim() },
+    });
+    await carregarUsuarios();
+  } catch (e) {
+    alert('Erro ao editar: ' + e.message);
+  }
+}
+
+async function excluirUsuario(id, nome) {
+  if (!confirm(`Excluir o usuário "${nome}"?`)) return;
+  try {
+    await api(`/api/usuarios/${id}`, { method: 'DELETE' });
+    await carregarUsuarios();
+  } catch (e) {
+    alert('Erro ao excluir: ' + e.message);
+  }
 }
 
 function popularSelects() {
