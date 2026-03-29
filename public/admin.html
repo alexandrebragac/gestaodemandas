@@ -35,6 +35,10 @@
     .modal.hidden { display: none; }
     .modal-content { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 28px 28px 24px; width: 100%; max-width: 400px; position: relative; }
     .modal-close { position: absolute; top: 14px; right: 16px; background: none; border: none; color: var(--text-muted); font-size: 1.1rem; cursor: pointer; }
+    .badge-pendente  { background: rgba(255,203,0,.15); color: #ffcb00; padding: 2px 8px; border-radius: 20px; font-size: .72rem; font-weight: 600; }
+    .badge-aprovado  { background: rgba(0,200,117,.15); color: #00c875; padding: 2px 8px; border-radius: 20px; font-size: .72rem; font-weight: 600; }
+    .badge-rejeitado { background: rgba(255,91,91,.15); color: #ff5b5b; padding: 2px 8px; border-radius: 20px; font-size: .72rem; font-weight: 600; }
+    .sol-count { display: inline-flex; align-items: center; justify-content: center; background: var(--danger); color: #fff; border-radius: 20px; font-size: .7rem; font-weight: 700; min-width: 18px; height: 18px; padding: 0 5px; margin-left: 6px; }
   </style>
 </head>
 <body>
@@ -53,6 +57,25 @@
   </nav>
 
   <div class="admin-grid">
+
+    <!-- Solicitações de Cadastro -->
+    <div class="admin-card" style="grid-column: 1 / -1" id="card-solicitacoes">
+      <h2>📋 Solicitações de Cadastro <span id="sol-badge" class="sol-count" style="display:none">0</span></h2>
+
+      <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap">
+        <button class="btn-sm" id="tab-pendentes" onclick="filtrarSolicitacoes('pendente')" style="border-color:var(--accent);color:var(--accent)">⏳ Pendentes</button>
+        <button class="btn-sm" id="tab-todas" onclick="filtrarSolicitacoes('todas')">📋 Todas</button>
+      </div>
+
+      <div style="overflow-x:auto">
+        <table id="tabela-solicitacoes">
+          <thead><tr>
+            <th>Nome</th><th>Email</th><th>WhatsApp</th><th>Canal</th><th>Data</th><th>Status</th><th>Ações</th>
+          </tr></thead>
+          <tbody id="tbody-solicitacoes"><tr><td colspan="7" style="color:var(--text-muted)">Carregando...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
 
     <!-- Lista de Usuários -->
     <div class="admin-card" style="grid-column: 1 / -1">
@@ -304,6 +327,78 @@
     document.getElementById('modal-editar-cancel').addEventListener('click', () => document.getElementById('modal-editar').classList.add('hidden'));
 
     carregarUsuarios();
+
+    // ── Solicitações de Cadastro ─────────────────────────────────────────────
+    let solicitacoes = [];
+    let filtroAtual  = 'pendente';
+
+    async function carregarSolicitacoes() {
+      try {
+        const todas = await api('/api/cadastro/todas');
+        solicitacoes = todas || [];
+        const pendentes = solicitacoes.filter(s => s.status === 'pendente');
+        const badge = document.getElementById('sol-badge');
+        if (pendentes.length > 0) { badge.textContent = pendentes.length; badge.style.display = 'inline-flex'; }
+        else { badge.style.display = 'none'; }
+        renderSolicitacoes();
+      } catch(e) { console.error('Erro ao carregar solicitações:', e.message); }
+    }
+
+    function filtrarSolicitacoes(filtro) {
+      filtroAtual = filtro;
+      document.getElementById('tab-pendentes').style.borderColor = filtro === 'pendente' ? 'var(--accent)' : 'var(--border)';
+      document.getElementById('tab-pendentes').style.color = filtro === 'pendente' ? 'var(--accent)' : 'var(--text-muted)';
+      document.getElementById('tab-todas').style.borderColor = filtro === 'todas' ? 'var(--accent)' : 'var(--border)';
+      document.getElementById('tab-todas').style.color = filtro === 'todas' ? 'var(--accent)' : 'var(--text-muted)';
+      renderSolicitacoes();
+    }
+
+    function renderSolicitacoes() {
+      const lista = filtroAtual === 'pendente' ? solicitacoes.filter(s => s.status === 'pendente') : solicitacoes;
+      const tbody = document.getElementById('tbody-solicitacoes');
+      if (!lista.length) {
+        tbody.innerHTML = `<tr><td colspan="7" style="color:var(--text-muted);text-align:center;padding:16px">${filtroAtual === 'pendente' ? 'Nenhuma solicitação pendente.' : 'Nenhuma solicitação encontrada.'}</td></tr>`;
+        return;
+      }
+      tbody.innerHTML = lista.map(s => {
+        const dt = s.criado_em ? s.criado_em.slice(0,16).replace('T',' ') : '—';
+        const acoes = s.status === 'pendente' ? `
+          <div class="action-btns">
+            <button class="btn-sm" onclick="aprovarSolicitacao('${s.id}','${s.nome.replace(/'/g,'\\\'')}')" style="border-color:#00c875;color:#00c875">✅ Aprovar</button>
+            <button class="btn-sm danger" onclick="rejeitarSolicitacao('${s.id}','${s.nome.replace(/'/g,'\\\'')}')" >❌ Rejeitar</button>
+          </div>` : `<span style="font-size:.78rem;color:var(--text-muted)">${s.nota_admin || '—'}</span>`;
+        return `<tr>
+          <td><strong>${s.nome}</strong></td>
+          <td style="color:var(--text-muted)">${s.email}</td>
+          <td style="color:var(--text-muted);font-size:.8rem">${s.telefone_whatsapp}</td>
+          <td><span class="canal-badge canal-${s.canal||'whatsapp'}">${{whatsapp:'💬 WhatsApp',email:'📧 Email',ambos:'💬📧 Ambos'}[s.canal||'whatsapp']}</span></td>
+          <td style="color:var(--text-muted);font-size:.8rem">${dt}</td>
+          <td><span class="badge-${s.status}">${{pendente:'⏳ Pendente',aprovado:'✅ Aprovado',rejeitado:'❌ Rejeitado'}[s.status]||s.status}</span></td>
+          <td>${acoes}</td>
+        </tr>`;
+      }).join('');
+    }
+
+    async function aprovarSolicitacao(id, nome) {
+      if (!confirm(`Aprovar o cadastro de "${nome}"?\n\nUma senha provisória será gerada e enviada via WhatsApp.`)) return;
+      try {
+        const data = await api(`/api/cadastro/aprovar/${id}`, { method:'POST', body:{} });
+        alert(`✅ Cadastro de "${nome}" aprovado!\n\nSenha provisória: ${data.senha_provisoria}\n\nO usuário foi notificado via WhatsApp.`);
+        await carregarSolicitacoes();
+        await carregarUsuarios();
+      } catch(e) { alert('❌ Erro: ' + e.message); }
+    }
+
+    async function rejeitarSolicitacao(id, nome) {
+      const nota = prompt(`Rejeitar o cadastro de "${nome}"?\n\nMotivo (opcional):`);
+      if (nota === null) return; // cancelou
+      try {
+        await api(`/api/cadastro/rejeitar/${id}`, { method:'POST', body: { nota: nota || undefined } });
+        await carregarSolicitacoes();
+      } catch(e) { alert('❌ Erro: ' + e.message); }
+    }
+
+    carregarSolicitacoes();
   </script>
 </body>
 </html>

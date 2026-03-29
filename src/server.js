@@ -63,6 +63,22 @@ try { db.prepare("ALTER TABLE usuarios ADD COLUMN canal TEXT NOT NULL DEFAULT 'w
 try { db.prepare("ALTER TABLE usuarios ADD COLUMN senha_hash TEXT").run(); console.log('[Migration] Adicionada coluna senha_hash'); } catch (_) {}
 try { db.prepare("ALTER TABLE usuarios ADD COLUMN perfil TEXT NOT NULL DEFAULT 'usuario'").run(); console.log('[Migration] Adicionada coluna perfil'); } catch (_) {}
 
+// Tabela de solicitações de cadastro
+db.exec(`
+  CREATE TABLE IF NOT EXISTS solicitacoes_cadastro (
+    id TEXT PRIMARY KEY,
+    nome TEXT NOT NULL,
+    email TEXT NOT NULL UNIQUE,
+    telefone_whatsapp TEXT NOT NULL,
+    canal TEXT NOT NULL DEFAULT 'whatsapp',
+    status TEXT NOT NULL DEFAULT 'pendente'
+      CHECK(status IN ('pendente','aprovado','rejeitado')),
+    nota_admin TEXT,
+    criado_em TEXT NOT NULL DEFAULT (datetime('now')),
+    processado_em TEXT
+  );
+`);
+
 // Insere configurações padrão se ainda não existirem
 const defaults = {
   horario_relatorio: '08:00',
@@ -105,6 +121,7 @@ app.use('/api/demandas', require('./routes/demandas'));
 app.use('/api/configuracoes', require('./routes/configuracoes'));
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/email-acao', require('./routes/emailAcao'));
+app.use('/api/cadastro', require('./routes/cadastro'));
 app.use('/webhook', require('./routes/webhook'));
 
 // Health check

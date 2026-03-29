@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Solicitar Cadastro — Gestão de Demandas</title>
+  <link rel="stylesheet" href="/css/style.css" />
+  <style>
+    body { display: flex; align-items: center; justify-content: center; min-height: 100vh; padding: 20px; box-sizing: border-box; }
+    .box {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 36px 32px;
+      width: 100%;
+      max-width: 420px;
+      box-shadow: 0 8px 32px rgba(0,0,0,.4);
+    }
+    .box-header { text-align: center; margin-bottom: 24px; }
+    .box-header h1 { font-size: 1.35rem; color: var(--text); margin: 0 0 5px; }
+    .box-header p  { font-size: .83rem; color: var(--text-muted); margin: 0; }
+
+    label { display: block; font-size: .75rem; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: .06em; margin: 14px 0 5px; }
+    input, select {
+      width: 100%; padding: 10px 12px; background: var(--surface-3); border: 1px solid var(--border);
+      border-radius: 8px; color: var(--text); font-size: .95rem; font-family: inherit; box-sizing: border-box;
+    }
+    input:focus, select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-glow); }
+
+    .tel-row { display: flex; gap: 6px; }
+    .tel-prefix {
+      width: 80px; flex-shrink: 0; padding: 10px 10px; background: var(--surface-2); border: 1px solid var(--border);
+      border-radius: 8px; color: var(--text-muted); font-size: .9rem; font-family: inherit; text-align: center;
+      user-select: none; cursor: default;
+    }
+    .tel-row input { flex: 1; }
+
+    .btn-submit {
+      width: 100%; padding: 13px; background: var(--accent); color: #fff; border: none;
+      border-radius: 8px; font-size: 1rem; font-weight: 700; cursor: pointer; margin-top: 20px;
+      font-family: inherit; transition: background .15s;
+    }
+    .btn-submit:hover { background: var(--accent-hover); }
+    .btn-submit:disabled { opacity: .5; cursor: not-allowed; }
+
+    .form-msg { font-size: .85rem; text-align: center; margin-top: 12px; min-height: 20px; }
+    .form-msg.ok  { color: var(--success); }
+    .form-msg.err { color: var(--danger); }
+
+    .footer-link { margin-top: 18px; text-align: center; font-size: .82rem; color: var(--text-muted); }
+    .footer-link a { color: var(--accent); text-decoration: none; }
+
+    .success-box { display: none; text-align: center; padding: 20px 0; }
+    .success-box .icon { font-size: 2.5rem; margin-bottom: 12px; }
+    .success-box h2 { color: var(--success); margin-bottom: 8px; }
+    .success-box p { color: var(--text-muted); font-size: .9rem; }
+  </style>
+</head>
+<body>
+  <div class="box">
+    <div class="box-header">
+      <h1>📋 Gestão de Demandas</h1>
+      <p>Solicite seu acesso ao sistema</p>
+    </div>
+
+    <div id="form-area">
+      <label for="nome">Nome completo</label>
+      <input type="text" id="nome" placeholder="Seu nome" autocomplete="name" />
+
+      <label for="email">Email</label>
+      <input type="email" id="email" placeholder="seu@email.com" autocomplete="email" />
+
+      <label>WhatsApp</label>
+      <div class="tel-row">
+        <div class="tel-prefix" id="tel-prefix">+55</div>
+        <input type="tel" id="telefone" placeholder="(85) 9 1234-5678" maxlength="15" />
+      </div>
+      <div style="font-size:.72rem;color:var(--text-muted);margin-top:4px">
+        Digite DDD + número. O dígito 9 após o DDD será tratado automaticamente.
+      </div>
+
+      <label for="canal">Como prefere receber notificações?</label>
+      <select id="canal">
+        <option value="whatsapp">💬 WhatsApp</option>
+        <option value="email">📧 Email</option>
+        <option value="ambos">💬📧 Ambos</option>
+      </select>
+
+      <button class="btn-submit" id="btn-solicitar">Solicitar Cadastro</button>
+      <div class="form-msg" id="form-msg"></div>
+
+      <div class="footer-link">
+        Já tem acesso? <a href="/login.html">Fazer login</a>
+      </div>
+    </div>
+
+    <div class="success-box" id="success-box">
+      <div class="icon">✅</div>
+      <h2>Solicitação Enviada!</h2>
+      <p>Seu pedido foi registrado com sucesso.<br>O administrador será notificado e você receberá a confirmação pelo canal escolhido.</p>
+      <div class="footer-link" style="margin-top:20px">
+        <a href="/login.html">← Voltar para o login</a>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const telInput = document.getElementById('telefone');
+
+    // Máscara de telefone: (85) 1234-5678  ou  (85) 9 1234-5678
+    telInput.addEventListener('input', () => {
+      let v = telInput.value.replace(/\D/g, '');
+      if (v.length > 11) v = v.slice(0, 11);
+      // Aplica máscara
+      if (v.length <= 2)       telInput.value = v.replace(/^(\d{0,2})/, '($1');
+      else if (v.length <= 6)  telInput.value = v.replace(/^(\d{2})(\d{0,4})/, '($1) $2');
+      else if (v.length <= 10) telInput.value = v.replace(/^(\d{2})(\d{4})(\d{0,4})/, '($1) $2-$3');
+      else                     telInput.value = v.replace(/^(\d{2})(\d{5})(\d{0,4})/, '($1) $2-$3');
+    });
+
+    function normalizarTelefone(mascarado) {
+      // Extrai apenas dígitos
+      const digits = mascarado.replace(/\D/g, '');
+      // Prefixo: +55 + DDD(2) + numero
+      // Se o número tiver 11 dígitos (DDD + 9 + 8), remove o 9 após DDD
+      if (digits.length === 11) {
+        const ddd   = digits.slice(0, 2);   // ex: '85'
+        const resto = digits.slice(2);       // ex: '912345678'
+        if (resto.startsWith('9') && resto.length === 9) {
+          return `+55${ddd}${resto.slice(1)}`; // +558512345678
+        }
+      }
+      return `+55${digits}`;
+    }
+
+    document.getElementById('btn-solicitar').addEventListener('click', async () => {
+      const nome     = document.getElementById('nome').value.trim();
+      const email    = document.getElementById('email').value.trim();
+      const telMask  = document.getElementById('telefone').value;
+      const canal    = document.getElementById('canal').value;
+      const msgEl    = document.getElementById('form-msg');
+
+      msgEl.textContent = '';
+      msgEl.className   = 'form-msg';
+
+      if (!nome || !email || !telMask) {
+        msgEl.textContent = '❌ Preencha todos os campos obrigatórios.';
+        msgEl.className   = 'form-msg err';
+        return;
+      }
+
+      const telefone = normalizarTelefone(telMask);
+      const btn = document.getElementById('btn-solicitar');
+      btn.disabled = true;
+      btn.textContent = '⏳ Enviando...';
+
+      try {
+        const res = await fetch('/api/cadastro/solicitar', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ nome, email, telefone, canal }),
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          msgEl.textContent = '❌ ' + (data.erro || 'Erro ao enviar solicitação.');
+          msgEl.className   = 'form-msg err';
+          return;
+        }
+        // Sucesso
+        document.getElementById('form-area').style.display = 'none';
+        document.getElementById('success-box').style.display = 'block';
+      } catch (e) {
+        msgEl.textContent = '❌ Erro de conexão. Verifique o servidor.';
+        msgEl.className   = 'form-msg err';
+      } finally {
+        btn.disabled    = false;
+        btn.textContent = 'Solicitar Cadastro';
+      }
+    });
+  </script>
+</body>
+</html>
