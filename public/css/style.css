@@ -398,6 +398,35 @@ details summary {
 }
 .demanda-meta span { display: flex; align-items: center; gap: 4px; }
 
+/* ── Modal de stats ─────────────────────────────────────────────────────────── */
+.stat-demandas-lista { display: flex; flex-direction: column; gap: 8px; max-height: 60vh; overflow-y: auto; }
+.stat-demanda-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  background: var(--surface-3);
+  border-radius: 8px;
+  border: 1px solid var(--border);
+}
+.stat-demanda-info { flex: 1; min-width: 0; }
+.stat-demanda-desc { font-size: .9rem; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.stat-demanda-meta { font-size: .75rem; color: var(--text-muted); margin-top: 3px; display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+.btn-stat-abrir, .btn-stat-update {
+  padding: 5px 8px;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: .85rem;
+  transition: background .15s, border-color .15s;
+}
+.btn-stat-abrir:hover  { background: var(--surface-2); border-color: var(--accent); }
+.btn-stat-update:hover { background: var(--surface-2); border-color: var(--success); }
+.btn-stat-update:disabled { opacity: .5; cursor: not-allowed; }
+.ov-stat[data-uid] { transition: transform .1s, box-shadow .1s; }
+.ov-stat[data-uid]:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,.3); }
+
 /* Badge de origem */
 .origem-badge {
   display: inline-flex;

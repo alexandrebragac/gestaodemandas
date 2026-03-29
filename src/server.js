@@ -56,6 +56,12 @@ try { db.prepare('ALTER TABLE demandas ADD COLUMN horario_entrega TEXT').run(); 
 try { db.prepare('ALTER TABLE demandas ADD COLUMN clickup_url TEXT').run(); console.log('[Migration] Adicionada coluna clickup_url'); } catch (_) {}
 // Migration: add origem
 try { db.prepare("ALTER TABLE demandas ADD COLUMN origem TEXT NOT NULL DEFAULT 'web'").run(); console.log('[Migration] Adicionada coluna origem'); } catch (_) {}
+// Migration: email + canal
+try { db.prepare("ALTER TABLE usuarios ADD COLUMN email TEXT").run(); console.log('[Migration] Adicionada coluna email'); } catch (_) {}
+try { db.prepare("ALTER TABLE usuarios ADD COLUMN canal TEXT NOT NULL DEFAULT 'whatsapp'").run(); console.log('[Migration] Adicionada coluna canal'); } catch (_) {}
+// Migration: senha_hash + perfil para auth web
+try { db.prepare("ALTER TABLE usuarios ADD COLUMN senha_hash TEXT").run(); console.log('[Migration] Adicionada coluna senha_hash'); } catch (_) {}
+try { db.prepare("ALTER TABLE usuarios ADD COLUMN perfil TEXT NOT NULL DEFAULT 'usuario'").run(); console.log('[Migration] Adicionada coluna perfil'); } catch (_) {}
 
 // Insere configurações padrão se ainda não existirem
 const defaults = {
@@ -74,6 +80,16 @@ const defaults = {
 const insertCfg = db.prepare('INSERT OR IGNORE INTO configuracoes (chave, valor) VALUES (?, ?)');
 for (const [chave, valor] of Object.entries(defaults)) insertCfg.run(chave, valor);
 
+// Se não há admin, promove o primeiro usuário cadastrado para admin
+const adminExistente = db.prepare("SELECT id FROM usuarios WHERE perfil = 'admin' LIMIT 1").get();
+if (!adminExistente) {
+  const primeiro = db.prepare('SELECT id FROM usuarios ORDER BY criado_em ASC LIMIT 1').get();
+  if (primeiro) {
+    db.prepare("UPDATE usuarios SET perfil = 'admin' WHERE id = ?").run(primeiro.id);
+    console.log('[Setup] Primeiro usuário promovido a admin automaticamente.');
+  }
+}
+
 const app = express();
 
 app.use(cors());
@@ -87,6 +103,8 @@ app.use(express.static(path.join(__dirname, '..', 'public')));
 app.use('/api/usuarios', require('./routes/usuarios'));
 app.use('/api/demandas', require('./routes/demandas'));
 app.use('/api/configuracoes', require('./routes/configuracoes'));
+app.use('/api/auth', require('./routes/auth'));
+app.use('/api/email-acao', require('./routes/emailAcao'));
 app.use('/webhook', require('./routes/webhook'));
 
 // Health check

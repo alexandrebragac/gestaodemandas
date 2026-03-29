@@ -1,14 +1,13 @@
 const API = '';
-const AUTH_KEY = 'gestao_current_user';
+const AUTH_KEY = 'gestao_auth';
 
 // ── Auth ─────────────────────────────────────────────────────────────────────
 
-function getCurrentUser() {
-  try {
-    const raw = localStorage.getItem(AUTH_KEY);
-    return raw ? JSON.parse(raw) : null;
-  } catch { return null; }
+function getAuth() {
+  try { return JSON.parse(localStorage.getItem(AUTH_KEY) || 'null'); } catch { return null; }
 }
+function getCurrentUser() { return getAuth()?.usuario || null; }
+function getToken()       { return getAuth()?.token   || null; }
 
 function requireAuth() {
   const user = getCurrentUser();
@@ -46,11 +45,16 @@ function gerarLinkCalendario(descricao, dataIso, horario) {
 }
 
 async function api(path, options = {}) {
+  const token = getToken();
   const res = await fetch(API + path, {
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
     ...options,
     body: options.body ? JSON.stringify(options.body) : undefined,
   });
+  if (res.status === 401) { logout(); return; }
   if (!res.ok) {
     const err = await res.json().catch(() => ({ erro: 'Erro desconhecido' }));
     throw new Error(err.erro || `HTTP ${res.status}`);
@@ -183,22 +187,22 @@ function renderUsuariosOverview() {
       </div>
       <div class="ov-section-label">Como responsável</div>
       <div class="ov-stats-row">
-        <div class="ov-stat red">
+        <div class="ov-stat red"   data-uid="${s.u.id}" data-tipo="vencidas"       style="cursor:pointer" title="Ver vencidas">
           <span class="ov-stat-num">${s.vencidas}</span>
           <span class="ov-stat-label">Vencidas</span>
         </div>
-        <div class="ov-stat yellow">
+        <div class="ov-stat yellow" data-uid="${s.u.id}" data-tipo="pendente_aceite" style="cursor:pointer" title="Ver aguardando aceite">
           <span class="ov-stat-num">${s.pendenteAceite}</span>
           <span class="ov-stat-label">Pend. Aceite</span>
         </div>
-        <div class="ov-stat green">
+        <div class="ov-stat green"  data-uid="${s.u.id}" data-tipo="em_andamento"    style="cursor:pointer" title="Ver em andamento">
           <span class="ov-stat-num">${s.emAndamento}</span>
           <span class="ov-stat-label">Em Andamento</span>
         </div>
       </div>
       <div class="ov-section-label">Como solicitante</div>
       <div class="ov-stats-row">
-        <div class="ov-stat purple">
+        <div class="ov-stat purple" data-uid="${s.u.id}" data-tipo="aguardando_baixa" style="cursor:pointer" title="Ver aguardando baixa">
           <span class="ov-stat-num">${s.aguardandoBaixa}</span>
           <span class="ov-stat-label">Ag. Baixa</span>
         </div>
@@ -210,6 +214,94 @@ function renderUsuariosOverview() {
     <div class="usuarios-overview-header">Visão por Usuário</div>
     <div class="usuario-overview-grid">${cards}</div>
   `;
+
+  // Delegação de clique nos stat-chips
+  container.querySelectorAll('[data-uid][data-tipo]').forEach(el => {
+    el.addEventListener('click', () => abrirModalStats(el.dataset.uid, el.dataset.tipo));
+  });
+}
+
+// ── Modal: Detalhes de stats por usuário ─────────────────────────────────────
+
+const TITULO_STAT = {
+  vencidas:        '⚠️ Vencidas',
+  pendente_aceite: '🟡 Aguardando Aceite',
+  em_andamento:    '🟢 Em Andamento',
+  aguardando_baixa:'🟣 Aguardando Baixa',
+};
+
+function filtrarDemandasStat(uid, tipo) {
+  const hoje = new Date().toISOString().slice(0, 10);
+  if (tipo === 'vencidas')
+    return demandas.filter(d => d.responsavel_id === uid &&
+      ['pendente_aceite','em_negociacao','aceita','em_andamento'].includes(d.status) &&
+      (d.data_acordada || d.data_entrega) < hoje);
+  if (tipo === 'pendente_aceite')
+    return demandas.filter(d => d.responsavel_id === uid && d.status === 'pendente_aceite');
+  if (tipo === 'em_andamento')
+    return demandas.filter(d => d.responsavel_id === uid && ['aceita','em_andamento','em_negociacao'].includes(d.status));
+  if (tipo === 'aguardando_baixa')
+    return demandas.filter(d => d.solicitante_id === uid && d.status === 'concluida_aguardando_baixa');
+  return [];
+}
+
+async function abrirModalStats(uid, tipo) {
+  const usuario = usuarios.find(u => u.id === uid);
+  const lista = filtrarDemandasStat(uid, tipo);
+  const titulo = TITULO_STAT[tipo] || tipo;
+
+  const modal = document.getElementById('modal-stats');
+  const body  = document.getElementById('modal-stats-body');
+
+  const linhas = lista.length === 0
+    ? '<p style="color:var(--text-muted);font-size:.88rem">Nenhuma atividade nesta categoria.</p>'
+    : lista.map(d => `
+      <div class="stat-demanda-row">
+        <div class="stat-demanda-info">
+          <div class="stat-demanda-desc">${d.descricao}</div>
+          <div class="stat-demanda-meta">
+            📅 ${prazoInfo(d)}
+            · ${d.solicitante?.nome || d.responsavel?.nome || '—'}
+            <span class="demanda-badge badge-${d.status}" style="margin-left:6px">${statusLabel(d.status)}</span>
+          </div>
+        </div>
+        <div style="display:flex;gap:6px;flex-shrink:0">
+          <button class="btn-stat-abrir" data-id="${d.id}" title="Ver detalhes">👁️</button>
+          <button class="btn-stat-update" data-id="${d.id}" title="Solicitar atualização">📩</button>
+        </div>
+      </div>`).join('');
+
+  body.innerHTML = `
+    <div style="font-size:1.05rem;font-weight:700;margin-bottom:4px">${titulo}</div>
+    <div style="font-size:.82rem;color:var(--text-muted);margin-bottom:16px">${usuario?.nome} · ${lista.length} atividade(s)</div>
+    <div class="stat-demandas-lista">${linhas}</div>
+  `;
+
+  modal.classList.remove('hidden');
+
+  body.querySelectorAll('.btn-stat-abrir').forEach(btn =>
+    btn.addEventListener('click', async () => {
+      modal.classList.add('hidden');
+      await abrirModal(btn.dataset.id);
+    })
+  );
+  body.querySelectorAll('.btn-stat-update').forEach(btn =>
+    btn.addEventListener('click', () => solicitarAtualizacao(btn.dataset.id, btn))
+  );
+}
+
+async function solicitarAtualizacao(demandaId, btn) {
+  btn.disabled = true;
+  btn.textContent = '⏳';
+  try {
+    await api(`/api/demandas/${demandaId}/solicitar-atualizacao`, { method: 'POST', body: { usuario_id: currentUser?.id } });
+    btn.textContent = '✅';
+    setTimeout(() => { btn.textContent = '📩'; btn.disabled = false; }, 3000);
+  } catch (e) {
+    btn.textContent = '❌';
+    setTimeout(() => { btn.textContent = '📩'; btn.disabled = false; }, 3000);
+    alert('Erro: ' + e.message);
+  }
 }
 
 // ── Render: Usuários ─────────────────────────────────────────────────────────
@@ -517,6 +609,8 @@ document.getElementById('form-usuario').addEventListener('submit', async (e) => 
   const body = {
     nome: document.getElementById('u-nome').value,
     telefone_whatsapp: document.getElementById('u-telefone').value,
+    email: document.getElementById('u-email')?.value || null,
+    canal: document.getElementById('u-canal')?.value || 'whatsapp',
   };
   try {
     await api('/api/usuarios', { method: 'POST', body });
@@ -573,11 +667,24 @@ document.getElementById('modal').addEventListener('click', (e) => {
   if (e.target === e.currentTarget) fecharModal();
 });
 
+document.getElementById('modal-stats-close').addEventListener('click', () => {
+  document.getElementById('modal-stats').classList.add('hidden');
+});
+document.getElementById('modal-stats').addEventListener('click', (e) => {
+  if (e.target === e.currentTarget) e.currentTarget.classList.add('hidden');
+});
+
 // ── Init ─────────────────────────────────────────────────────────────────────
 
 (async () => {
   currentUser = requireAuth();
   if (!currentUser) return;
+
+  // Mostra link admin para admins
+  if (currentUser.perfil === 'admin') {
+    const navAdmin = document.getElementById('nav-admin');
+    if (navAdmin) navAdmin.style.display = '';
+  }
 
   // Mostra usuário logado no header
   const headerInner = document.querySelector('.header-inner');

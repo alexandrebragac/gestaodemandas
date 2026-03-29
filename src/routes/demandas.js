@@ -2,8 +2,9 @@ const express = require('express');
 const { v4: uuidv4 } = require('uuid');
 const getDb = require('../database/db');
 const whatsappService = require('../services/whatsapp');
+const notificacoes    = require('../services/notificacoes');
 const lembreteService = require('../services/lembretes');
-const clickupService = require('../services/clickup');
+const clickupService  = require('../services/clickup');
 
 const router = express.Router();
 
@@ -89,13 +90,13 @@ router.post('/', async (req, res) => {
     console.error('[ClickUp] Erro ao criar tarefa:', err.message);
   }
 
-  // Notifica responsável via WhatsApp
+  // Notifica responsável via canal configurado (WhatsApp / Email / Ambos)
   let whatsappErro = null;
   try {
-    await whatsappService.notificarNovaDeamanda(responsavel, solicitante, { id, descricao, data_entrega, horario_entrega: horario_entrega || null, clickup_url });
+    await notificacoes.novaDemanda(responsavel, solicitante, { id, descricao, data_entrega, horario_entrega: horario_entrega || null, clickup_url });
   } catch (err) {
     whatsappErro = err.message;
-    console.error('[WhatsApp] Falha ao notificar nova demanda:', err.message);
+    console.error('[Notificação] Falha ao notificar nova demanda:', err.message);
   }
 
   const demanda = db.prepare('SELECT * FROM demandas WHERE id = ?').get(id);
@@ -158,7 +159,7 @@ router.post('/:id/aceitar', async (req, res) => {
   db.prepare('DELETE FROM lembretes WHERE demanda_id = ? AND enviado = 0').run(demanda.id);
   lembreteService.agendarLembretes(demanda.id, dataAcordada);
 
-  await whatsappService.notificarAceite(solicitante, responsavel, { ...demanda, data_acordada: dataAcordada });
+  await notificacoes.aceite(solicitante, responsavel, { ...demanda, data_acordada: dataAcordada });
 
   const atualizada = db.prepare('SELECT * FROM demandas WHERE id = ?').get(demanda.id);
   res.json(demandaComUsuarios(atualizada));
@@ -184,7 +185,7 @@ router.post('/:id/propor-prazo', async (req, res) => {
   db.prepare(`INSERT INTO mensagens (id, demanda_id, remetente_id, tipo, conteudo) VALUES (?, ?, ?, 'resposta', ?)`)
     .run(msgId, demanda.id, demanda.responsavel_id, conteudo);
 
-  await whatsappService.notificarNovoPrazo(solicitante, responsavel, { ...demanda, nova_data, observacao });
+  await notificacoes.novoPrazo(solicitante, responsavel, { ...demanda, nova_data, observacao });
 
   const atualizada = db.prepare('SELECT * FROM demandas WHERE id = ?').get(demanda.id);
   res.json(demandaComUsuarios(atualizada));
@@ -215,7 +216,7 @@ router.post('/:id/concluir', async (req, res) => {
   db.prepare(`INSERT INTO mensagens (id, demanda_id, remetente_id, tipo, conteudo) VALUES (?, ?, ?, 'conclusao', ?)`)
     .run(uuidv4(), demanda.id, demanda.responsavel_id, `Demanda concluída por ${responsavel.nome}. Aguardando baixa do solicitante.`);
 
-  await whatsappService.notificarConclusao(solicitante, responsavel, demanda);
+  await notificacoes.conclusao(solicitante, responsavel, demanda);
 
   // Remove lembretes pendentes do responsável e agenda lembretes para solicitante
   db.prepare('DELETE FROM lembretes WHERE demanda_id = ? AND enviado = 0').run(demanda.id);
@@ -251,7 +252,7 @@ router.post('/:id/baixa', async (req, res) => {
   db.prepare(`INSERT INTO mensagens (id, demanda_id, remetente_id, tipo, conteudo) VALUES (?, ?, ?, 'baixa', ?)`)
     .run(uuidv4(), demanda.id, demanda.solicitante_id, `Baixa confirmada por ${solicitante.nome}. Demanda finalizada.`);
 
-  await whatsappService.notificarBaixa(responsavel, solicitante, demanda);
+  await notificacoes.baixa(responsavel, solicitante, demanda);
 
   const atualizada = db.prepare('SELECT * FROM demandas WHERE id = ?').get(demanda.id);
   res.json(demandaComUsuarios(atualizada));
@@ -280,6 +281,23 @@ router.delete('/:id', (req, res) => {
 
   excluir();
   res.status(204).end();
+});
+
+// POST /demandas/:id/solicitar-atualizacao
+router.post('/:id/solicitar-atualizacao', async (req, res) => {
+  const db = getDb();
+  const demanda = db.prepare('SELECT * FROM demandas WHERE id = ?').get(req.params.id);
+  if (!demanda) return res.status(404).json({ erro: 'Demanda não encontrada' });
+
+  const solicitante = db.prepare('SELECT * FROM usuarios WHERE id = ?').get(req.body.usuario_id || demanda.solicitante_id);
+  const responsavel  = db.prepare('SELECT * FROM usuarios WHERE id = ?').get(demanda.responsavel_id);
+
+  try {
+    await notificacoes.solicitarAtualizacao(responsavel, solicitante, demanda);
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ erro: err.message });
+  }
 });
 
 // GET /demandas/:id/mensagens

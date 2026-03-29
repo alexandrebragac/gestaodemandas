@@ -1,5 +1,6 @@
 const express = require('express');
 const getDb = require('../database/db');
+const whatsappService = require('../services/whatsapp');
 const { enviarRelatoriosDiarios, reconfigurarScheduler } = require('../services/scheduler');
 
 const router = express.Router();
@@ -59,6 +60,19 @@ router.post('/testar-relatorio', async (req, res) => {
     res.json({ ok: true, mensagem: 'Relatório enviado com sucesso!' });
   } catch (err) {
     res.status(500).json({ erro: err.message });
+  }
+});
+
+// POST /api/configuracoes/testar-whatsapp/:id — envia msg de teste para um usuário
+router.post('/testar-whatsapp/:id', async (req, res) => {
+  const db = getDb();
+  const usuario = db.prepare('SELECT * FROM usuarios WHERE id = ?').get(req.params.id);
+  if (!usuario) return res.status(404).json({ erro: 'Usuário não encontrado' });
+  try {
+    await whatsappService.enviarMensagem(usuario, `🔔 *Teste de Conectividade*\n\nOlá ${usuario.nome}! Sua conta está conectada ao sistema de Gestão de Demandas.\n\n_Esta é uma mensagem de teste._`);
+    res.json({ ok: true, numero: usuario.telefone_whatsapp });
+  } catch (err) {
+    res.status(500).json({ erro: err.message, numero: usuario.telefone_whatsapp });
   }
 });
 

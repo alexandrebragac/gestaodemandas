@@ -21,22 +21,18 @@ router.get('/:id', (req, res) => {
 
 // POST /usuarios
 router.post('/', (req, res) => {
-  const { nome, telefone_whatsapp } = req.body;
+  const { nome, telefone_whatsapp, email, canal } = req.body;
   if (!nome || !telefone_whatsapp) {
     return res.status(400).json({ erro: 'nome e telefone_whatsapp são obrigatórios' });
   }
-
   const db = getDb();
   const id = uuidv4();
   try {
-    db.prepare('INSERT INTO usuarios (id, nome, telefone_whatsapp) VALUES (?, ?, ?)')
-      .run(id, nome.trim(), telefone_whatsapp.trim());
-    const usuario = db.prepare('SELECT * FROM usuarios WHERE id = ?').get(id);
-    res.status(201).json(usuario);
+    db.prepare('INSERT INTO usuarios (id, nome, telefone_whatsapp, email, canal) VALUES (?, ?, ?, ?, ?)')
+      .run(id, nome.trim(), telefone_whatsapp.trim(), email?.trim() || null, canal || 'whatsapp');
+    res.status(201).json(db.prepare('SELECT * FROM usuarios WHERE id = ?').get(id));
   } catch (err) {
-    if (err.message.includes('UNIQUE')) {
-      return res.status(409).json({ erro: 'Telefone já cadastrado' });
-    }
+    if (err.message.includes('UNIQUE')) return res.status(409).json({ erro: 'Telefone ou email já cadastrado' });
     throw err;
   }
 });
@@ -44,20 +40,20 @@ router.post('/', (req, res) => {
 // PUT /usuarios/:id
 router.put('/:id', (req, res) => {
   const db = getDb();
-  const usuario = db.prepare('SELECT * FROM usuarios WHERE id = ?').get(req.params.id);
-  if (!usuario) return res.status(404).json({ erro: 'Usuário não encontrado' });
+  const u = db.prepare('SELECT * FROM usuarios WHERE id = ?').get(req.params.id);
+  if (!u) return res.status(404).json({ erro: 'Usuário não encontrado' });
 
-  const nome = req.body.nome ?? usuario.nome;
-  const telefone = req.body.telefone_whatsapp ?? usuario.telefone_whatsapp;
+  const nome     = req.body.nome              ?? u.nome;
+  const telefone = req.body.telefone_whatsapp ?? u.telefone_whatsapp;
+  const email    = req.body.email !== undefined ? (req.body.email?.trim() || null) : u.email;
+  const canal    = req.body.canal             ?? u.canal ?? 'whatsapp';
 
   try {
-    db.prepare('UPDATE usuarios SET nome = ?, telefone_whatsapp = ? WHERE id = ?')
-      .run(nome.trim(), telefone.trim(), req.params.id);
+    db.prepare('UPDATE usuarios SET nome=?, telefone_whatsapp=?, email=?, canal=? WHERE id=?')
+      .run(nome.trim(), telefone.trim(), email, canal, req.params.id);
     res.json(db.prepare('SELECT * FROM usuarios WHERE id = ?').get(req.params.id));
   } catch (err) {
-    if (err.message.includes('UNIQUE')) {
-      return res.status(409).json({ erro: 'Telefone já cadastrado' });
-    }
+    if (err.message.includes('UNIQUE')) return res.status(409).json({ erro: 'Telefone ou email já cadastrado' });
     throw err;
   }
 });

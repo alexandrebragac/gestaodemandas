@@ -17,6 +17,7 @@
   <nav class="nav-tabs">
     <a href="/" class="nav-tab active">Dashboard</a>
     <a href="/configuracoes.html" class="nav-tab">⚙️ Configurações</a>
+    <a href="/admin.html" class="nav-tab" id="nav-admin" style="display:none">👥 Admin</a>
   </nav>
 
   <main>
@@ -66,6 +67,14 @@
             <form id="form-usuario">
               <label>Nome <input type="text" id="u-nome" required /></label>
               <label>Telefone (com DDI) <input type="text" id="u-telefone" placeholder="+5511999990001" required /></label>
+              <label>Email <input type="email" id="u-email" placeholder="usuario@empresa.com" /></label>
+              <label>Canal
+                <select id="u-canal">
+                  <option value="whatsapp">💬 WhatsApp</option>
+                  <option value="email">📧 Email</option>
+                  <option value="ambos">💬📧 Ambos</option>
+                </select>
+              </label>
               <button type="submit" class="btn-secondary">Adicionar</button>
             </form>
             <div id="form-usuario-msg" class="form-msg"></div>
@@ -115,6 +124,14 @@
           </div>
           <div id="edit-usuario-msg" class="form-msg"></div>
         </form>
+      </div>
+    </div>
+
+    <!-- Modal de stats por usuário -->
+    <div id="modal-stats" class="modal hidden">
+      <div class="modal-content" style="max-width:520px">
+        <button class="modal-close" id="modal-stats-close">✕</button>
+        <div id="modal-stats-body"></div>
       </div>
     </div>
 

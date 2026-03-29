@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Admin — Gestão de Demandas</title>
+  <link rel="stylesheet" href="/css/style.css" />
+  <style>
+    .admin-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; max-width: 960px; margin: 20px auto; padding: 0 16px; }
+    @media(max-width:700px){ .admin-grid{ grid-template-columns:1fr; } }
+    .admin-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 22px 24px; }
+    .admin-card h2 { font-size: .95rem; font-weight: 700; color: var(--accent); margin-bottom: 16px; }
+    table { width: 100%; border-collapse: collapse; font-size: .85rem; }
+    th { text-align: left; color: var(--text-muted); font-weight: 600; font-size: .75rem; text-transform: uppercase; letter-spacing: .05em; padding: 6px 8px; border-bottom: 1px solid var(--border); }
+    td { padding: 9px 8px; border-bottom: 1px solid var(--border-light); vertical-align: middle; }
+    tr:last-child td { border-bottom: none; }
+    .badge-admin   { background: rgba(124,92,252,.18); color: var(--accent); padding: 2px 8px; border-radius: 20px; font-size: .72rem; font-weight: 600; }
+    .badge-usuario { background: rgba(136,136,170,.12); color: var(--text-muted); padding: 2px 8px; border-radius: 20px; font-size: .72rem; font-weight: 600; }
+    .canal-badge { padding: 2px 7px; border-radius: 20px; font-size: .7rem; font-weight: 600; }
+    .canal-whatsapp { background: rgba(0,200,117,.12); color: #00c875; }
+    .canal-email    { background: rgba(77,158,255,.12); color: #4d9eff; }
+    .canal-ambos    { background: rgba(255,203,0,.12);  color: #ffcb00; }
+    .action-btns { display: flex; gap: 4px; }
+    .btn-sm { padding: 5px 10px; background: transparent; border: 1px solid var(--border); border-radius: 6px; cursor: pointer; font-size: .78rem; color: var(--text-muted); font-family: inherit; transition: all .15s; }
+    .btn-sm:hover { border-color: var(--accent); color: var(--accent); }
+    .btn-sm.danger:hover { border-color: var(--danger); color: var(--danger); }
+    label { display: block; font-size: .78rem; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: .05em; margin: 12px 0 5px; }
+    input, select { width: 100%; padding: 9px 11px; background: var(--surface-3); border: 1px solid var(--border); border-radius: 7px; color: var(--text); font-size: .9rem; font-family: inherit; box-sizing: border-box; }
+    input:focus, select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-glow); }
+    .form-msg { font-size: .83rem; margin-top: 8px; min-height: 18px; }
+    .form-msg.ok  { color: var(--success); }
+    .form-msg.err { color: var(--danger); }
+    .whatsapp-test-row { display: flex; align-items: center; gap: 8px; margin-top: 6px; }
+    .modal { position: fixed; inset: 0; background: rgba(0,0,0,.65); display: flex; align-items: center; justify-content: center; z-index: 200; }
+    .modal.hidden { display: none; }
+    .modal-content { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 28px 28px 24px; width: 100%; max-width: 400px; position: relative; }
+    .modal-close { position: absolute; top: 14px; right: 16px; background: none; border: none; color: var(--text-muted); font-size: 1.1rem; cursor: pointer; }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="header-inner">
+      <h1>📋 Gestão de Demandas</h1>
+      <span class="subtitle">Administração</span>
+      <div id="user-badge" style="display:flex;align-items:center;gap:10px;margin-left:auto"></div>
+    </div>
+  </header>
+
+  <nav class="nav-tabs">
+    <a href="/" class="nav-tab">Dashboard</a>
+    <a href="/configuracoes.html" class="nav-tab">⚙️ Configurações</a>
+    <a href="/admin.html" class="nav-tab active">👥 Administração</a>
+  </nav>
+
+  <div class="admin-grid">
+
+    <!-- Lista de Usuários -->
+    <div class="admin-card" style="grid-column: 1 / -1">
+      <h2>👥 Usuários do Sistema</h2>
+      <div style="overflow-x:auto">
+        <table id="tabela-usuarios">
+          <thead><tr>
+            <th>Nome</th><th>Email</th><th>WhatsApp</th><th>Canal</th><th>Perfil</th><th>Ações</th>
+          </tr></thead>
+          <tbody id="tbody-usuarios"><tr><td colspan="6" style="color:var(--text-muted)">Carregando...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Adicionar Usuário -->
+    <div class="admin-card">
+      <h2>➕ Adicionar Usuário</h2>
+      <form id="form-novo-usuario">
+        <label>Nome <input type="text" id="n-nome" required /></label>
+        <label>Email <input type="email" id="n-email" placeholder="usuario@empresa.com" /></label>
+        <label>WhatsApp (com DDI) <input type="text" id="n-telefone" placeholder="+5511999990001" required /></label>
+        <label>Canal de notificação
+          <select id="n-canal">
+            <option value="whatsapp">💬 WhatsApp</option>
+            <option value="email">📧 Email</option>
+            <option value="ambos">💬📧 Ambos</option>
+          </select>
+        </label>
+        <label>Senha inicial <input type="password" id="n-senha" placeholder="Mínimo 6 caracteres" /></label>
+        <label>Perfil
+          <select id="n-perfil">
+            <option value="usuario">Usuário</option>
+            <option value="admin">Administrador</option>
+          </select>
+        </label>
+        <button type="submit" class="btn-primary" style="width:100%;margin-top:14px">Adicionar</button>
+        <div id="msg-novo" class="form-msg"></div>
+      </form>
+    </div>
+
+    <!-- Definir Senha -->
+    <div class="admin-card">
+      <h2>🔑 Definir / Resetar Senha</h2>
+      <label>Usuário
+        <select id="senha-usuario-id"></select>
+      </label>
+      <label>Nova Senha <input type="password" id="nova-senha" placeholder="Mínimo 6 caracteres" /></label>
+      <button class="btn-primary" id="btn-set-senha" style="width:100%;margin-top:14px">Definir Senha</button>
+      <div id="msg-senha" class="form-msg"></div>
+
+      <hr style="border:none;border-top:1px solid var(--border);margin:18px 0" />
+      <h2 style="margin-bottom:12px">📱 Testar WhatsApp</h2>
+      <label>Usuário
+        <select id="test-whatsapp-usuario"></select>
+      </label>
+      <div class="whatsapp-test-row">
+        <button class="btn-secondary" id="btn-testar-whatsapp" style="flex:1">Enviar msg de teste</button>
+        <span id="msg-whatsapp-test" style="font-size:.8rem;color:var(--text-muted)"></span>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Modal editar usuário -->
+  <div id="modal-editar" class="modal hidden">
+    <div class="modal-content">
+      <button class="modal-close" id="modal-editar-close">✕</button>
+      <h2 style="color:var(--accent);margin-bottom:16px;font-size:1rem">✏️ Editar Usuário</h2>
+      <input type="hidden" id="edit-id" />
+      <label>Nome <input type="text" id="edit-nome" /></label>
+      <label>Email <input type="email" id="edit-email" /></label>
+      <label>WhatsApp <input type="text" id="edit-telefone" /></label>
+      <label>Canal
+        <select id="edit-canal">
+          <option value="whatsapp">💬 WhatsApp</option>
+          <option value="email">📧 Email</option>
+          <option value="ambos">💬📧 Ambos</option>
+        </select>
+      </label>
+      <label>Perfil
+        <select id="edit-perfil">
+          <option value="usuario">Usuário</option>
+          <option value="admin">Administrador</option>
+        </select>
+      </label>
+      <div style="display:flex;gap:8px;margin-top:14px">
+        <button class="btn-primary" id="btn-salvar-edicao" style="flex:1">Salvar</button>
+        <button class="btn-secondary" id="modal-editar-cancel">Cancelar</button>
+      </div>
+      <div id="msg-editar" class="form-msg"></div>
+    </div>
+  </div>
+
+  <script>
+    const AUTH_KEY = 'gestao_auth';
+    function getAuth()       { try { return JSON.parse(localStorage.getItem(AUTH_KEY)||'null'); } catch{return null;} }
+    function getCurrentUser(){ return getAuth()?.usuario||null; }
+    function getToken()      { return getAuth()?.token||null; }
+    function logout()        { localStorage.removeItem(AUTH_KEY); window.location.href='/login.html'; }
+
+    const currentUser = getCurrentUser();
+    if (!currentUser) { window.location.href = '/login.html?redirect=/admin.html'; }
+    else if (currentUser.perfil !== 'admin') { alert('Acesso restrito a administradores.'); window.location.href = '/'; }
+    else {
+      document.getElementById('user-badge').innerHTML = `
+        <span style="font-size:.85rem;color:var(--text-muted)">Olá, <strong style="color:var(--text)">${currentUser.nome.split(' ')[0]}</strong></span>
+        <button onclick="logout()" style="padding:5px 12px;background:transparent;border:1px solid var(--border);border-radius:6px;color:var(--text-muted);font-size:.8rem;cursor:pointer;font-family:inherit">Sair</button>
+      `;
+    }
+
+    async function api(path, opts = {}) {
+      const token = getToken();
+      const res = await fetch(path, {
+        headers: { 'Content-Type':'application/json', ...(token?{Authorization:`Bearer ${token}`}:{}) },
+        ...opts, body: opts.body ? JSON.stringify(opts.body) : undefined,
+      });
+      if (res.status === 401) { logout(); return; }
+      if (!res.ok) { const e = await res.json().catch(()=>({erro:'Erro'})); throw new Error(e.erro||`HTTP ${res.status}`); }
+      return res.status === 204 ? null : res.json();
+    }
+
+    function showMsg(id, msg, type) {
+      const el = document.getElementById(id);
+      el.textContent = msg; el.className = `form-msg ${type}`;
+      setTimeout(() => { el.textContent=''; el.className='form-msg'; }, 4000);
+    }
+
+    const CANAL_LABEL = { whatsapp: '💬 WhatsApp', email: '📧 Email', ambos: '💬📧 Ambos' };
+
+    let usuarios = [];
+
+    async function carregarUsuarios() {
+      usuarios = await api('/api/usuarios');
+      renderTabela();
+      popularSelects();
+    }
+
+    function renderTabela() {
+      const tbody = document.getElementById('tbody-usuarios');
+      tbody.innerHTML = usuarios.map(u => `
+        <tr>
+          <td><strong>${u.nome}</strong></td>
+          <td style="color:var(--text-muted)">${u.email || '—'}</td>
+          <td style="color:var(--text-muted);font-size:.8rem">${u.telefone_whatsapp}</td>
+          <td><span class="canal-badge canal-${u.canal||'whatsapp'}">${CANAL_LABEL[u.canal||'whatsapp']}</span></td>
+          <td><span class="badge-${u.perfil||'usuario'}">${(u.perfil||'usuario')==='admin'?'Admin':'Usuário'}</span></td>
+          <td>
+            <div class="action-btns">
+              <button class="btn-sm" onclick="abrirEdicao('${u.id}')">✏️ Editar</button>
+              <button class="btn-sm danger" onclick="excluirUsuario('${u.id}','${u.nome}')">🗑️</button>
+            </div>
+          </td>
+        </tr>
+      `).join('');
+    }
+
+    function popularSelects() {
+      const opts = usuarios.map(u => `<option value="${u.id}">${u.nome}</option>`).join('');
+      document.getElementById('senha-usuario-id').innerHTML = opts;
+      document.getElementById('test-whatsapp-usuario').innerHTML = opts;
+    }
+
+    // Formulário novo usuário
+    document.getElementById('form-novo-usuario').addEventListener('submit', async e => {
+      e.preventDefault();
+      const body = {
+        nome: document.getElementById('n-nome').value,
+        email: document.getElementById('n-email').value || null,
+        telefone_whatsapp: document.getElementById('n-telefone').value,
+        canal: document.getElementById('n-canal').value,
+        perfil: document.getElementById('n-perfil').value,
+      };
+      const senha = document.getElementById('n-senha').value;
+      try {
+        const novoUser = await api('/api/usuarios', { method:'POST', body });
+        // Define senha se fornecida
+        if (senha && novoUser?.id) {
+          await api('/api/auth/setup-senha', { method:'POST', body: { usuario_id: novoUser.id, senha } });
+        }
+        if (novoUser?.id && body.perfil === 'admin') {
+          await api(`/api/auth/perfil/${novoUser.id}`, { method:'PUT', body: { perfil: 'admin' } });
+        }
+        showMsg('msg-novo','✅ Usuário adicionado!','ok');
+        e.target.reset();
+        await carregarUsuarios();
+      } catch(err) { showMsg('msg-novo','❌ '+err.message,'err'); }
+    });
+
+    // Definir senha
+    document.getElementById('btn-set-senha').addEventListener('click', async () => {
+      const usuario_id = document.getElementById('senha-usuario-id').value;
+      const senha = document.getElementById('nova-senha').value;
+      try {
+        await api('/api/auth/setup-senha', { method:'POST', body: { usuario_id, senha } });
+        showMsg('msg-senha','✅ Senha definida!','ok');
+        document.getElementById('nova-senha').value = '';
+      } catch(err) { showMsg('msg-senha','❌ '+err.message,'err'); }
+    });
+
+    // Testar WhatsApp
+    document.getElementById('btn-testar-whatsapp').addEventListener('click', async () => {
+      const id = document.getElementById('test-whatsapp-usuario').value;
+      const msgEl = document.getElementById('msg-whatsapp-test');
+      try {
+        await api(`/api/configuracoes/testar-whatsapp/${id}`, { method:'POST', body:{} });
+        msgEl.textContent = '✅ Enviado!'; msgEl.style.color = 'var(--success)';
+      } catch(e) { msgEl.textContent = '❌ '+e.message; msgEl.style.color = 'var(--danger)'; }
+      setTimeout(() => { msgEl.textContent=''; }, 4000);
+    });
+
+    // Editar usuário
+    function abrirEdicao(id) {
+      const u = usuarios.find(x => x.id === id);
+      if (!u) return;
+      document.getElementById('edit-id').value = u.id;
+      document.getElementById('edit-nome').value = u.nome;
+      document.getElementById('edit-email').value = u.email || '';
+      document.getElementById('edit-telefone').value = u.telefone_whatsapp;
+      document.getElementById('edit-canal').value = u.canal || 'whatsapp';
+      document.getElementById('edit-perfil').value = u.perfil || 'usuario';
+      document.getElementById('modal-editar').classList.remove('hidden');
+    }
+
+    document.getElementById('btn-salvar-edicao').addEventListener('click', async () => {
+      const id = document.getElementById('edit-id').value;
+      const body = {
+        nome: document.getElementById('edit-nome').value,
+        email: document.getElementById('edit-email').value || null,
+        telefone_whatsapp: document.getElementById('edit-telefone').value,
+        canal: document.getElementById('edit-canal').value,
+        perfil: document.getElementById('edit-perfil').value,
+      };
+      try {
+        await api(`/api/usuarios/${id}`, { method:'PUT', body });
+        document.getElementById('modal-editar').classList.add('hidden');
+        await carregarUsuarios();
+      } catch(e) { showMsg('msg-editar','❌ '+e.message,'err'); }
+    });
+
+    async function excluirUsuario(id, nome) {
+      if (!confirm(`Excluir "${nome}"?`)) return;
+      try {
+        await api(`/api/usuarios/${id}`, { method:'DELETE' });
+        await carregarUsuarios();
+      } catch(e) { alert('Erro: '+e.message); }
+    }
+
+    document.getElementById('modal-editar-close').addEventListener('click', () => document.getElementById('modal-editar').classList.add('hidden'));
+    document.getElementById('modal-editar-cancel').addEventListener('click', () => document.getElementById('modal-editar').classList.add('hidden'));
+
+    carregarUsuarios();
+  </script>
+</body>
+</html>

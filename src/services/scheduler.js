@@ -1,6 +1,8 @@
 const cron = require('node-cron');
 const getDb = require('../database/db');
 const whatsappService = require('./whatsapp');
+const emailService    = require('./email');
+const notificacoes    = require('./notificacoes');
 
 let jobRelatorio = null;
 
@@ -100,10 +102,14 @@ async function enviarRelatoriosDiarios() {
     const vencem_hoje      = demandasAtivas.filter(d => prazo(d) === hoje);
     const vencem_em_3_dias = demandasAtivas.filter(d => prazo(d) > hoje && prazo(d) <= em3diasStr);
 
-    await whatsappService.enviarRelatorioDiario(usuario, {
-      vencidas, vencem_hoje, vencem_em_3_dias,
-      total_ativas: demandasAtivas.length,
-    });
+    const dadosRelatorio = { vencidas, vencem_hoje, vencem_em_3_dias, total_ativas: demandasAtivas.length };
+    const canal = usuario.canal || 'whatsapp';
+    if (canal === 'whatsapp' || canal === 'ambos') {
+      try { await whatsappService.enviarRelatorioDiario(usuario, dadosRelatorio); } catch (e) { console.error('[Scheduler] WhatsApp relatório:', e.message); }
+    }
+    if (canal === 'email' || canal === 'ambos') {
+      try { await emailService.enviarRelatorioEmail(usuario, dadosRelatorio); } catch (e) { console.error('[Scheduler] Email relatório:', e.message); }
+    }
   }
 }
 
@@ -165,7 +171,7 @@ async function enviarLembrete(lembrete, db) {
 
   if (lembrete.tipo === 'aguardando_baixa') {
     const solicitante = db.prepare('SELECT * FROM usuarios WHERE id = ?').get(lembrete.solicitante_id);
-    if (solicitante) await whatsappService.enviarLembrete(solicitante, demanda, 'aguardando_baixa');
+    if (solicitante) await notificacoes.lembrete(solicitante, demanda, 'aguardando_baixa');
   } else {
     const responsavel = db.prepare('SELECT * FROM usuarios WHERE id = ?').get(lembrete.responsavel_id);
     if (!responsavel) return;
@@ -184,7 +190,7 @@ async function enviarLembrete(lembrete, db) {
       tipo = 'apos_vencimento';
     }
     const solicitante = db.prepare('SELECT * FROM usuarios WHERE id = ?').get(lembrete.solicitante_id);
-    await whatsappService.enviarLembrete(responsavel, demanda, tipo, solicitante || null);
+    await notificacoes.lembrete(responsavel, demanda, tipo);
   }
 }
 
@@ -216,7 +222,7 @@ async function verificarPendentesNaoRespondidos() {
     const solicitante = db.prepare('SELECT * FROM usuarios WHERE id = ?').get(d.solicitante_id);
     const demanda = { id: d.id, descricao: d.descricao, data_entrega: d.data_entrega, horario_entrega: d.horario_entrega, data_acordada: d.data_acordada, status: d.status };
     try {
-      await whatsappService.enviarLembrete(responsavel, demanda, 'pendente_aceite', solicitante);
+      await notificacoes.lembrete(responsavel, demanda, 'pendente_aceite');
     } catch (err) {
       console.error(`[Scheduler] Erro ao enviar alerta pendente ${d.id}:`, err.message);
     }
