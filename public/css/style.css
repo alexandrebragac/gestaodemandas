@@ -398,6 +398,20 @@ details summary {
 }
 .demanda-meta span { display: flex; align-items: center; gap: 4px; }
 
+/* Badge de origem */
+.origem-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: .68rem;
+  font-weight: 600;
+  padding: 2px 7px;
+  border-radius: 20px;
+  letter-spacing: .02em;
+}
+.origem-web      { background: rgba(77,158,255,.12); color: #4d9eff; border: 1px solid rgba(77,158,255,.25); }
+.origem-whatsapp { background: rgba(0,200,117,.12);  color: #00c875; border: 1px solid rgba(0,200,117,.25); }
+
 /* Vencimento */
 .vencido { color: var(--danger); font-weight: 600; }
 .vence-hoje { color: var(--warning); font-weight: 600; }

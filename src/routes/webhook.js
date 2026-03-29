@@ -297,7 +297,7 @@ async function fluxoCriarConfirmacao(usuario, texto, comando, parametros, sessao
 
   const db = getDb();
   const id = uuidv4();
-  db.prepare(`INSERT INTO demandas (id, solicitante_id, responsavel_id, descricao, data_entrega, horario_entrega) VALUES (?, ?, ?, ?, ?, ?)`)
+  db.prepare(`INSERT INTO demandas (id, solicitante_id, responsavel_id, descricao, data_entrega, horario_entrega, origem) VALUES (?, ?, ?, ?, ?, ?, 'whatsapp')`)
     .run(id, usuario.id, sessao.responsavel.id, sessao.descricao.trim(), sessao.data_entrega, sessao.horario_entrega || null);
 
   db.prepare(`INSERT INTO mensagens (id, demanda_id, remetente_id, tipo, conteudo) VALUES (?, ?, ?, 'criacao', ?)`)

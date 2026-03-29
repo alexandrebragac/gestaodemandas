@@ -76,6 +76,10 @@ function statusLabel(s) {
   return labels[s] || s;
 }
 
+function origemLabel(origem) {
+  return origem === 'whatsapp' ? '💬 WhatsApp' : '🖥️ Web';
+}
+
 function iniciais(nome) {
   return nome.split(' ').slice(0, 2).map(p => p[0]).join('').toUpperCase();
 }
@@ -293,6 +297,7 @@ function renderDemandas() {
       <div class="demanda-meta">
         <span>👤 ${d.solicitante?.nome || '—'} → ${d.responsavel?.nome || '—'}</span>
         <span>📅 ${prazoInfo(d)}</span>
+        <span class="origem-badge origem-${d.origem || 'web'}">${origemLabel(d.origem)}</span>
       </div>
     </div>
   `).join('');
@@ -356,6 +361,7 @@ async function abrirModal(id) {
           <div><strong>Prazo acordado:</strong> ${formatDate(demanda.data_acordada)}</div>
           <div><strong>Criado em:</strong> ${formatDate(demanda.criado_em)}</div>
           <div><strong>Atualizado:</strong> ${formatDate(demanda.atualizado_em)}</div>
+          <div><strong>Origem:</strong> <span class="origem-badge origem-${demanda.origem || 'web'}">${origemLabel(demanda.origem)}</span></div>
         </div>
       </div>
 

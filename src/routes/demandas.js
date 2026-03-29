@@ -65,8 +65,8 @@ router.post('/', async (req, res) => {
 
   const id = uuidv4();
   db.prepare(`
-    INSERT INTO demandas (id, solicitante_id, responsavel_id, descricao, data_entrega, horario_entrega)
-    VALUES (?, ?, ?, ?, ?, ?)
+    INSERT INTO demandas (id, solicitante_id, responsavel_id, descricao, data_entrega, horario_entrega, origem)
+    VALUES (?, ?, ?, ?, ?, ?, 'web')
   `).run(id, solicitante_id, responsavel_id, descricao.trim(), data_entrega, horario_entrega || null);
 
   // Registra mensagem de criação
