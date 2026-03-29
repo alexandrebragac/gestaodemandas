@@ -492,9 +492,14 @@ document.getElementById('form-demanda').addEventListener('submit', async (e) => 
     horario_entrega: document.getElementById('horario-entrega').value || null,
   };
   try {
-    await api('/api/demandas', { method: 'POST', body });
-    showMsg('form-msg', '✅ Demanda criada! Notificação WhatsApp enviada ao responsável.', 'ok');
+    const result = await api('/api/demandas', { method: 'POST', body });
+    if (result._whatsapp_erro) {
+      showMsg('form-msg', `⚠️ Demanda criada, mas falha no WhatsApp: ${result._whatsapp_erro}`, 'err');
+    } else {
+      showMsg('form-msg', '✅ Demanda criada! Notificação WhatsApp enviada ao responsável.', 'ok');
+    }
     e.target.reset();
+    if (currentUser) document.getElementById('solicitante').value = currentUser.id;
     await carregarDemandas();
   } catch (err) {
     showMsg('form-msg', '❌ ' + err.message, 'err');

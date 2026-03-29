@@ -90,10 +90,18 @@ router.post('/', async (req, res) => {
   }
 
   // Notifica responsável via WhatsApp
-  await whatsappService.notificarNovaDeamanda(responsavel, solicitante, { id, descricao, data_entrega, horario_entrega: horario_entrega || null, clickup_url });
+  let whatsappErro = null;
+  try {
+    await whatsappService.notificarNovaDeamanda(responsavel, solicitante, { id, descricao, data_entrega, horario_entrega: horario_entrega || null, clickup_url });
+  } catch (err) {
+    whatsappErro = err.message;
+    console.error('[WhatsApp] Falha ao notificar nova demanda:', err.message);
+  }
 
   const demanda = db.prepare('SELECT * FROM demandas WHERE id = ?').get(id);
-  res.status(201).json(demandaComUsuarios(demanda));
+  const resposta = demandaComUsuarios(demanda);
+  if (whatsappErro) resposta._whatsapp_erro = whatsappErro;
+  res.status(201).json(resposta);
 });
 
 // PUT /demandas/:id
