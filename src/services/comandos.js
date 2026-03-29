@@ -41,8 +41,9 @@ function parsear(texto) {
   if (/^(ajuda|help|comandos|\?)$/i.test(norm))
     return { comando: COMANDOS.AJUDA };
 
-  if (/\b(criar|nova|novo|cadastrar|adicionar)\b.*\b(atividade|demanda|tarefa|task)\b/i.test(norm) ||
-      /\b(quero|preciso|vou)\b.*\b(criar|cadastrar|adicionar)\b/i.test(norm) ||
+  if (/\b(criar|criando|nova|novo|cadastrar|cadastrando|adicionar|adicionando|registrar|registrando)\b.*\b(atividade|demanda|tarefa|task)\b/i.test(norm) ||
+      /\b(atividade|demanda|tarefa|task)\b.*\b(para|pra)\b.*\b([a-záéíóúãõ]+)\b/i.test(norm) ||
+      /\b(quero|preciso|vou|estou)\b.*\b(criar|cadastrar|adicionar|registrar|lancar|lançar)\b/i.test(norm) ||
       /^(nova|nova demanda|criar|criar demanda|novo)$/i.test(norm))
     return { comando: COMANDOS.NOVA_DEMANDA };
 

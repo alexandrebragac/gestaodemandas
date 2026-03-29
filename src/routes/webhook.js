@@ -59,7 +59,7 @@ router.post('/whatsapp', async (req, res) => {
       case COMANDOS.NOVO_PRAZO:     await handleNovoPrazoComData(usuario, null, parametros?.data, telefone, res); break;
       case COMANDOS.CONCLUIR:       await handleConcluir(usuario, telefone, res); break;
       case COMANDOS.BAIXA:          await handleBaixa(usuario, telefone, res); break;
-      case COMANDOS.NOVA_DEMANDA:   await iniciarCriacaoDemanda(usuario, telefone, res); break;
+      case COMANDOS.NOVA_DEMANDA:   await iniciarCriacaoDemanda(usuario, telefone, res, texto); break;
       case COMANDOS.EDITAR_DEMANDA: await iniciarEdicaoDemanda(usuario, telefone, res); break;
       default:
         await handlePerguntaIA(usuario, texto, res);
@@ -187,7 +187,77 @@ async function continuarFluxo(usuario, texto, comando, parametros, sessao, telef
 // FLUXO: CRIAR DEMANDA
 // ══════════════════════════════════════════════════════════════════════════════
 
-async function iniciarCriacaoDemanda(usuario, telefone, res) {
+async function iniciarCriacaoDemanda(usuario, telefone, res, textoOriginal = null) {
+  // Tenta extrair campos da mensagem original antes do fluxo guiado
+  if (textoOriginal) {
+    const db = getDb();
+    const todosUsuarios = db.prepare('SELECT * FROM usuarios ORDER BY nome').all();
+    try {
+      const extraido = await iaService.extrairCamposCriacao(textoOriginal, todosUsuarios);
+      if (extraido && extraido.descricao) {
+        // Busca responsável por correspondência de nome
+        const responsavel = extraido.responsavel
+          ? todosUsuarios.find(u => {
+              const nomeU = u.nome.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+              const nomeE = extraido.responsavel.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+              return nomeU.includes(nomeE) || nomeE.includes(nomeU.split(' ')[0]);
+            })
+          : null;
+
+        const data_entrega = extraido.data ? normalizarData(extraido.data) : null;
+        const horario_entrega = extraido.horario || null;
+
+        // Caso completo: vai direto para confirmação
+        if (responsavel && data_entrega) {
+          setSessao(telefone, { fluxo: 'criar_confirmacao', descricao: extraido.descricao, responsavel, data_entrega, horario_entrega });
+          await whatsappService.enviarMensagem(usuario,
+            `✅ *Confirmar criação?*\n\n` +
+            `📋 Tarefa: ${extraido.descricao}\n` +
+            `👤 Responsável: ${responsavel.nome}\n` +
+            `📅 Entrega: ${formatarDataHora(data_entrega, horario_entrega)}\n\n` +
+            `*1* — Confirmar e criar\n` +
+            `*0* — Cancelar`
+          );
+          return res.status(200).send('OK');
+        }
+
+        // Tem descrição e data, falta responsável
+        if (!responsavel && data_entrega) {
+          setSessao(telefone, { fluxo: 'criar_responsavel', descricao: extraido.descricao, data_entrega, horario_entrega, usuarios: todosUsuarios });
+          let msg = `👤 *Para quem é essa tarefa?*\n\n`;
+          todosUsuarios.forEach((u, i) => {
+            msg += `*${i + 1}* — ${u.nome}${u.id === usuario.id ? ' _(você)_' : ''}\n`;
+          });
+          msg += `\n*0* — Cancelar`;
+          await whatsappService.enviarMensagem(usuario, msg);
+          return res.status(200).send('OK');
+        }
+
+        // Tem descrição e responsável, falta data
+        if (responsavel && !data_entrega) {
+          setSessao(telefone, { fluxo: 'criar_prazo', descricao: extraido.descricao, responsavel });
+          await whatsappService.enviarMensagem(usuario, `📅 *Data de entrega?*\n\nEx: *30/03/2026*\n\n*0* — Cancelar`);
+          return res.status(200).send('OK');
+        }
+
+        // Só tem descrição, começa pelo responsável
+        if (!responsavel && !data_entrega) {
+          setSessao(telefone, { fluxo: 'criar_responsavel', descricao: extraido.descricao, usuarios: todosUsuarios });
+          let msg = `👤 *Para quem é essa tarefa?*\n\n`;
+          todosUsuarios.forEach((u, i) => {
+            msg += `*${i + 1}* — ${u.nome}${u.id === usuario.id ? ' _(você)_' : ''}\n`;
+          });
+          msg += `\n*0* — Cancelar`;
+          await whatsappService.enviarMensagem(usuario, msg);
+          return res.status(200).send('OK');
+        }
+      }
+    } catch (e) {
+      console.error('[Webhook] Extração rápida falhou:', e.message);
+    }
+  }
+
+  // Fluxo guiado padrão (sem IA ou extração falhou)
   const pergunta = `📝 *Criar Nova Demanda*\n\nQual é a descrição da tarefa?\n\n_Digite o texto da tarefa ou *0* para cancelar_`;
   setSessao(telefone, { fluxo: 'criar_descricao', pergunta_atual: pergunta });
   await whatsappService.enviarMensagem(usuario, pergunta);
@@ -231,6 +301,21 @@ async function fluxoCriarResponsavel(usuario, texto, comando, parametros, sessao
     let msg = `⚠️ Opção inválida. Escolha:\n\n`;
     sessao.usuarios.forEach((u, i) => { msg += `*${i + 1}* — ${u.nome}\n`; });
     await whatsappService.enviarMensagem(usuario, msg);
+    return res.status(200).send('OK');
+  }
+
+  // Se data já foi extraída da mensagem original, pula para confirmação
+  if (sessao.data_entrega) {
+    const sessaoFinal = { ...sessao, fluxo: 'criar_confirmacao', responsavel };
+    setSessao(telefone, sessaoFinal);
+    await whatsappService.enviarMensagem(usuario,
+      `✅ *Confirmar criação?*\n\n` +
+      `📋 Tarefa: ${sessao.descricao}\n` +
+      `👤 Responsável: ${responsavel.nome}\n` +
+      `📅 Entrega: ${formatarDataHora(sessao.data_entrega, sessao.horario_entrega || null)}\n\n` +
+      `*1* — Confirmar e criar\n` +
+      `*0* — Cancelar`
+    );
     return res.status(200).send('OK');
   }
 

@@ -81,4 +81,52 @@ async function responderPergunta(usuario, pergunta) {
   return response.content[0].text;
 }
 
-module.exports = { responderPergunta };
+/**
+ * Tenta extrair campos de criação de demanda a partir de texto livre.
+ * Retorna { descricao, responsavel, data, horario } ou null.
+ */
+async function extrairCamposCriacao(texto, usuarios) {
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) return null;
+
+  const client = new Anthropic({ apiKey });
+  const hoje = new Date().toLocaleDateString('pt-BR');
+  const listaUsuarios = usuarios.map(u => u.nome).join(', ');
+
+  const prompt =
+    `Extraia dados de criação de atividade do texto abaixo.\n` +
+    `Usuários disponíveis: ${listaUsuarios}\n` +
+    `Data de hoje: ${hoje}\n\n` +
+    `Texto: "${texto}"\n\n` +
+    `Retorne SOMENTE JSON (sem markdown), com null nos campos não encontrados:\n` +
+    `{"descricao":"o que deve ser feito","responsavel":"nome de um dos usuários ou null","data":"DD/MM/AAAA ou null","horario":"HH:MM ou null"}\n\n` +
+    `Regras: descricao não deve incluir nome do responsável nem data. ` +
+    `responsavel deve ser o nome mais próximo da lista fornecida. ` +
+    `Converta datas relativas (amanhã, próxima semana) usando a data de hoje. ` +
+    `Se não houver descrição clara, retorne null no campo descricao.`;
+
+  try {
+    const timeout = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('timeout')), 6000)
+    );
+    const response = await Promise.race([
+      client.messages.create({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 150,
+        messages: [{ role: 'user', content: prompt }],
+      }),
+      timeout,
+    ]);
+
+    // Remove possíveis blocos markdown antes de parsear
+    const raw = response.content[0].text.trim().replace(/^```[a-z]*\n?/, '').replace(/\n?```$/, '');
+    const json = JSON.parse(raw);
+    if (!json || !json.descricao) return null;
+    return json;
+  } catch (e) {
+    console.error('[IA] extrairCamposCriacao:', e.message);
+    return null;
+  }
+}
+
+module.exports = { responderPergunta, extrairCamposCriacao };
