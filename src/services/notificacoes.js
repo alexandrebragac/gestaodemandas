@@ -11,23 +11,25 @@ const emailService    = require('./email');
 
 async function dispatch(usuario, fnWhatsapp, fnEmail, ...args) {
   const canal = usuario?.canal || 'whatsapp';
-  const erros = [];
+  const resultado = { whatsapp: null, email: null };
 
   if (canal === 'whatsapp' || canal === 'ambos') {
-    try { await fnWhatsapp(...args); } catch (e) { erros.push(`WhatsApp: ${e.message}`); }
+    try { await fnWhatsapp(...args); resultado.whatsapp = { ok: true }; }
+    catch (e) { resultado.whatsapp = { ok: false, erro: e.message }; console.error('[Notificações] WhatsApp:', e.message); }
   }
   if (canal === 'email' || canal === 'ambos') {
-    try { await fnEmail(...args); } catch (e) { erros.push(`Email: ${e.message}`); }
+    try { await fnEmail(...args); resultado.email = { ok: true }; }
+    catch (e) { resultado.email = { ok: false, erro: e.message }; console.error('[Notificações] Email:', e.message); }
   }
 
-  if (erros.length) console.error('[Notificações] Erros:', erros.join(' | '));
+  return resultado;
 }
 
 // ── Wrappers por notificação ──────────────────────────────────────────────────
 
 // Notifica o RESPONSÁVEL sobre nova demanda
 async function novaDemanda(responsavel, solicitante, demanda) {
-  await dispatch(
+  return dispatch(
     responsavel,
     () => whatsappService.notificarNovaDeamanda(responsavel, solicitante, demanda),
     () => emailService.notificarNovaDemanda(responsavel, solicitante, demanda)

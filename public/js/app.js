@@ -591,11 +591,16 @@ document.getElementById('form-demanda').addEventListener('submit', async (e) => 
   };
   try {
     const result = await api('/api/demandas', { method: 'POST', body });
-    if (result._whatsapp_erro) {
-      showMsg('form-msg', `⚠️ Demanda criada, mas falha no WhatsApp: ${result._whatsapp_erro}`, 'err');
-    } else {
-      showMsg('form-msg', '✅ Demanda criada! Notificação WhatsApp enviada ao responsável.', 'ok');
+    const n = result._notificacoes;
+    let feedback = '✅ Demanda criada!';
+    if (n) {
+      const partes = [];
+      if (n.whatsapp)       partes.push(n.whatsapp.ok       ? '💬 WhatsApp ✅' : `💬 WhatsApp ❌`);
+      if (n.email)          partes.push(n.email.ok          ? '📧 Email ✅'    : `📧 Email ❌`);
+      if (partes.length)    feedback += '  ' + partes.join('  ');
     }
+    const temErro = n && ((n.whatsapp && !n.whatsapp.ok) || (n.email && !n.email.ok));
+    showMsg('form-msg', feedback, temErro ? 'warn' : 'ok');
     e.target.reset();
     if (currentUser) document.getElementById('solicitante').value = currentUser.id;
     await carregarDemandas();

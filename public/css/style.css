@@ -232,8 +232,9 @@ details summary {
 }
 
 .form-msg { font-size: .82rem; margin-top: 8px; min-height: 20px; }
-.form-msg.ok { color: var(--success); }
-.form-msg.err { color: var(--danger); }
+.form-msg.ok   { color: var(--success); }
+.form-msg.err  { color: var(--danger); }
+.form-msg.warn { color: #ffcb00; }
 
 /* USER LIST */
 .user-list { list-style: none; }

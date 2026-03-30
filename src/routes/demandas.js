@@ -91,17 +91,16 @@ router.post('/', async (req, res) => {
   }
 
   // Notifica responsável via canal configurado (WhatsApp / Email / Ambos)
-  let whatsappErro = null;
+  let notificacaoResultado = null;
   try {
-    await notificacoes.novaDemanda(responsavel, solicitante, { id, descricao, data_entrega, horario_entrega: horario_entrega || null, clickup_url });
+    notificacaoResultado = await notificacoes.novaDemanda(responsavel, solicitante, { id, descricao, data_entrega, horario_entrega: horario_entrega || null, clickup_url });
   } catch (err) {
-    whatsappErro = err.message;
     console.error('[Notificação] Falha ao notificar nova demanda:', err.message);
   }
 
   const demanda = db.prepare('SELECT * FROM demandas WHERE id = ?').get(id);
   const resposta = demandaComUsuarios(demanda);
-  if (whatsappErro) resposta._whatsapp_erro = whatsappErro;
+  if (notificacaoResultado) resposta._notificacoes = notificacaoResultado;
   res.status(201).json(resposta);
 });
 
