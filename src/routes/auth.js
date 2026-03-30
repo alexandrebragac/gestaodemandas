@@ -185,9 +185,12 @@ router.put('/perfil/:id', authMiddleware, adminOnly, (req, res) => {
 // POST /api/auth/setup-admin — cria admin inicial (só funciona se não existir nenhum admin)
 router.post('/setup-admin', async (req, res) => {
   const { nome, email, senha, telefone, setup_key } = req.body;
-  const SETUP_KEY = process.env.SETUP_KEY || '';
-  if (!SETUP_KEY || setup_key !== SETUP_KEY) {
-    return res.status(403).json({ erro: 'setup_key inválida' });
+  const SETUP_KEY = (process.env.SETUP_KEY || '').trim();
+  if (!SETUP_KEY) {
+    return res.status(403).json({ erro: 'SETUP_KEY não configurada no servidor' });
+  }
+  if ((setup_key || '').trim() !== SETUP_KEY) {
+    return res.status(403).json({ erro: 'setup_key incorreta', recebido: (setup_key || '').trim(), tamanho: (setup_key || '').trim().length });
   }
   const db = getDb();
   const jaTemAdmin = db.prepare("SELECT id FROM usuarios WHERE perfil = 'admin' LIMIT 1").get();
