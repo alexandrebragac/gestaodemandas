@@ -1,4 +1,9 @@
 require('dotenv').config();
+
+// Força IPv4 em todas as conexões de rede (Railway não suporta IPv6 externo)
+const dns = require('dns');
+dns.setDefaultResultOrder('ipv4first');
+
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
