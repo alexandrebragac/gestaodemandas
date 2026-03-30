@@ -268,7 +268,8 @@ router.delete('/:id', (req, res) => {
 
   const usuario_id = req.query.usuario_id;
   if (usuario_id && usuario_id !== demanda.solicitante_id) {
-    return res.status(403).json({ erro: 'Apenas o solicitante pode excluir esta demanda' });
+    const ator = db.prepare('SELECT perfil FROM usuarios WHERE id = ?').get(usuario_id);
+    if (ator?.perfil !== 'admin') return res.status(403).json({ erro: 'Apenas o solicitante pode excluir esta demanda' });
   }
 
   if (demanda.status === STATUS.FINALIZADA) {
