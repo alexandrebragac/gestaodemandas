@@ -500,12 +500,19 @@ async function abrirModal(id) {
     // Eventos dos botões de ação (via delegação)
     document.getElementById('acoes-demanda').addEventListener('click', async (e) => {
       const btn = e.target.closest('[data-acao]');
-      if (!btn) return;
+      if (!btn || btn.disabled) return;
       const acao = btn.dataset.acao;
-      if (acao === 'excluir-demanda') {
-        await excluirDemanda(demanda.id, demanda.descricao);
-      } else {
-        await executarAcao(demanda.id, acao);
+      const textoOriginal = btn.textContent;
+      btn.disabled = true;
+      btn.textContent = '⏳';
+      try {
+        if (acao === 'excluir-demanda') {
+          await excluirDemanda(demanda.id, demanda.descricao, btn);
+        } else {
+          await executarAcao(demanda.id, acao);
+        }
+      } finally {
+        if (btn.isConnected) { btn.disabled = false; btn.textContent = textoOriginal; }
       }
     });
 
@@ -556,11 +563,11 @@ async function executarAcao(id, tipo) {
     fecharModal();
     await carregarDemandas();
   } catch (e) {
-    alert('Erro: ' + e.message);
+    showToast('❌ ' + e.message, 'err');
   }
 }
 
-async function excluirDemanda(id, descricao) {
+async function excluirDemanda(id, descricao, btn) {
   if (!confirm(`Excluir a demanda:\n"${descricao}"?\n\nEsta ação não pode ser desfeita.`)) return;
   try {
     const qs = currentUser ? `?usuario_id=${currentUser.id}` : '';
@@ -568,8 +575,31 @@ async function excluirDemanda(id, descricao) {
     fecharModal();
     await carregarDemandas();
   } catch (e) {
-    alert('Erro ao excluir demanda:\n' + e.message);
+    showToast('❌ Erro ao excluir: ' + e.message, 'err');
   }
+}
+
+function showToast(msg, type = 'ok') {
+  let toast = document.getElementById('toast-global');
+  if (!toast) {
+    toast = document.createElement('div');
+    toast.id = 'toast-global';
+    toast.style.cssText = 'position:fixed;bottom:24px;right:24px;padding:10px 18px;border-radius:8px;font-size:.85rem;font-weight:500;z-index:9999;transition:opacity .3s;box-shadow:0 4px 16px rgba(0,0,0,.4);border:1px solid';
+    document.body.appendChild(toast);
+  }
+  const colors = {
+    ok:   { bg: 'rgba(34,197,94,.15)',   color: '#22c55e', border: 'rgba(34,197,94,.3)'  },
+    err:  { bg: 'rgba(239,68,68,.15)',   color: '#ef4444', border: 'rgba(239,68,68,.3)'  },
+    warn: { bg: 'rgba(245,158,11,.15)',  color: '#f59e0b', border: 'rgba(245,158,11,.3)' },
+  };
+  const c = colors[type] || colors.ok;
+  toast.style.background = c.bg;
+  toast.style.color = c.color;
+  toast.style.borderColor = c.border;
+  toast.textContent = msg;
+  toast.style.opacity = '1';
+  clearTimeout(toast._timer);
+  toast._timer = setTimeout(() => { toast.style.opacity = '0'; }, 3500);
 }
 
 function fecharModal() {
