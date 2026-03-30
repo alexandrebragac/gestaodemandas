@@ -127,27 +127,28 @@ router.post('/recuperar-senha', async (req, res) => {
   const link = `${appUrl}/redefinir-senha.html?token=${token}`;
   const msg = `🔑 *Redefinição de Senha*\n\nOlá ${usuario.nome}! Clique no link abaixo para redefinir sua senha:\n\n${link}\n\n_O link expira em 1 hora._`;
 
-  // Envia via email e/ou WhatsApp conforme canal
-  const canal = usuario.canal || 'whatsapp';
-  try {
-    if (canal === 'email' || canal === 'ambos') {
-      const emailService = require('../services/email');
-      const html = `<!DOCTYPE html><html><body style="font-family:Arial;background:#13131f;color:#e2e2ee;padding:20px">
-        <div style="background:#1e1e2e;border:1px solid #3a3a52;border-radius:12px;max-width:500px;margin:0 auto;padding:28px">
-          <h2 style="color:#7c5cfc">🔑 Redefinição de Senha</h2>
-          <p>Olá <strong>${usuario.nome}</strong>!</p>
-          <p>Clique no botão abaixo para redefinir sua senha. O link expira em <strong>1 hora</strong>.</p>
-          <a href="${link}" style="display:inline-block;padding:12px 24px;background:#7c5cfc;color:#fff;border-radius:8px;text-decoration:none;font-weight:700;margin:16px 0">Redefinir Senha</a>
-          <p style="font-size:.8rem;color:#888">Se você não solicitou isso, ignore este email.</p>
-        </div>
-      </body></html>`;
+  // Recuperação de senha sempre tenta email (se cadastrado) + WhatsApp como fallback
+  const emailService    = require('../services/email');
+  const whatsappService = require('../services/whatsapp');
+  const html = `<!DOCTYPE html><html><body style="font-family:Arial;background:#13131f;color:#e2e2ee;padding:20px">
+    <div style="background:#1e1e2e;border:1px solid #3a3a52;border-radius:12px;max-width:500px;margin:0 auto;padding:28px">
+      <h2 style="color:#7c5cfc">🔑 Redefinição de Senha</h2>
+      <p>Olá <strong>${usuario.nome}</strong>!</p>
+      <p>Clique no botão abaixo para redefinir sua senha. O link expira em <strong>1 hora</strong>.</p>
+      <a href="${link}" style="display:inline-block;padding:12px 24px;background:#7c5cfc;color:#fff;border-radius:8px;text-decoration:none;font-weight:700;margin:16px 0">Redefinir Senha</a>
+      <p style="font-size:.8rem;color:#888">Se você não solicitou isso, ignore este email.</p>
+    </div>
+  </body></html>`;
+
+  if (usuario.email) {
+    try {
       await emailService.enviarEmail(usuario, '🔑 Redefinição de Senha — Gestão de Demandas', html);
-    }
-    if (canal === 'whatsapp' || canal === 'ambos') {
-      const whatsappService = require('../services/whatsapp');
-      await whatsappService.enviarMensagem(usuario, msg).catch(() => {});
-    }
-  } catch (_) {}
+      console.log(`[Auth] Email de recuperação enviado para ${usuario.email}`);
+    } catch (e) { console.error('[Auth] Erro ao enviar email de recuperação:', e.message); }
+  }
+  if (usuario.telefone_whatsapp) {
+    try { await whatsappService.enviarMensagem(usuario, msg); } catch (_) {}
+  }
 
   res.json({ ok: true, mensagem: 'Se o email existir, você receberá as instruções.' });
 });
