@@ -67,6 +67,15 @@ try { db.prepare("ALTER TABLE usuarios ADD COLUMN canal TEXT NOT NULL DEFAULT 'w
 // Migration: senha_hash + perfil para auth web
 try { db.prepare("ALTER TABLE usuarios ADD COLUMN senha_hash TEXT").run(); console.log('[Migration] Adicionada coluna senha_hash'); } catch (_) {}
 try { db.prepare("ALTER TABLE usuarios ADD COLUMN perfil TEXT NOT NULL DEFAULT 'usuario'").run(); console.log('[Migration] Adicionada coluna perfil'); } catch (_) {}
+// Migration: codigo sequencial
+try { db.prepare("ALTER TABLE demandas ADD COLUMN codigo TEXT").run(); console.log('[Migration] Adicionada coluna codigo'); } catch (_) {}
+// Preenche codigos faltantes nas demandas existentes
+const semCodigo = db.prepare("SELECT id FROM demandas WHERE codigo IS NULL ORDER BY criado_em ASC").all();
+semCodigo.forEach((d, i) => {
+  const max = db.prepare("SELECT MAX(CAST(REPLACE(codigo,'#','') AS INTEGER)) as m FROM demandas WHERE codigo IS NOT NULL").get();
+  const next = (max?.m || 0) + 1;
+  db.prepare("UPDATE demandas SET codigo = ? WHERE id = ?").run(`#${String(next).padStart(4,'0')}`, d.id);
+});
 
 // Tabela de tokens de recuperação de senha
 db.exec(`

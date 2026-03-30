@@ -395,7 +395,7 @@ function renderDemandas() {
   container.innerHTML = demandas.map(d => `
     <div class="demanda-card status-${d.status}" data-id="${d.id}" style="cursor:pointer">
       <div class="demanda-header">
-        <div class="demanda-descricao">${d.descricao}</div>
+        <div class="demanda-descricao"><span class="demanda-codigo">${d.codigo || ''}</span>${d.descricao}</div>
         <span class="demanda-badge badge-${d.status}">${statusLabel(d.status)}</span>
       </div>
       <div class="demanda-meta">
@@ -451,7 +451,7 @@ async function abrirModal(id) {
     ]);
 
     body.innerHTML = `
-      <div class="modal-title">${demanda.descricao}</div>
+      <div class="modal-title">${demanda.codigo ? `<span class="demanda-codigo" style="font-size:.8rem;vertical-align:middle;margin-right:8px">${demanda.codigo}</span>` : ''}${demanda.descricao}</div>
       <div style="margin-top:6px">
         <span class="demanda-badge badge-${demanda.status}" style="display:inline-block">${statusLabel(demanda.status)}</span>
       </div>

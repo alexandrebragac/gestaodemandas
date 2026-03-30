@@ -65,10 +65,13 @@ router.post('/', async (req, res) => {
   if (!responsavel) return res.status(404).json({ erro: 'Responsável não encontrado' });
 
   const id = uuidv4();
+  const maxCodigo = db.prepare("SELECT MAX(CAST(REPLACE(codigo,'#','') AS INTEGER)) as m FROM demandas WHERE codigo IS NOT NULL").get();
+  const nextNum = (maxCodigo?.m || 0) + 1;
+  const codigo = `#${String(nextNum).padStart(4,'0')}`;
   db.prepare(`
-    INSERT INTO demandas (id, solicitante_id, responsavel_id, descricao, data_entrega, horario_entrega, origem)
-    VALUES (?, ?, ?, ?, ?, ?, 'web')
-  `).run(id, solicitante_id, responsavel_id, descricao.trim(), data_entrega, horario_entrega || null);
+    INSERT INTO demandas (id, codigo, solicitante_id, responsavel_id, descricao, data_entrega, horario_entrega, origem)
+    VALUES (?, ?, ?, ?, ?, ?, ?, 'web')
+  `).run(id, codigo, solicitante_id, responsavel_id, descricao.trim(), data_entrega, horario_entrega || null);
 
   // Registra mensagem de criação
   const msgId = uuidv4();

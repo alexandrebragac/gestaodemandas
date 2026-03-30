@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Calendário — Gestão de Demandas</title>
+  <link rel="stylesheet" href="/css/style.css" />
+  <style>
+    main { max-width: 1100px; margin: 0 auto; padding: 20px 16px; }
+    .filter-bar { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; margin-bottom: 20px; }
+    .filter-bar label { display: flex; align-items: center; gap: 6px; font-size: .82rem; color: var(--text-muted); font-weight: 600; }
+    .filter-bar select { padding: 7px 10px; background: var(--surface-2); border: 1px solid var(--border); border-radius: 7px; color: var(--text); font-size: .85rem; font-family: inherit; }
+    .section-title { font-size: 1rem; font-weight: 700; color: var(--text); margin: 28px 0 14px; }
+    /* weekend cols */
+    .cal-day.weekend { background: #151515; }
+    /* modal */
+    .modal { position: fixed; inset: 0; background: rgba(0,0,0,.65); display: flex; align-items: center; justify-content: center; z-index: 200; padding: 16px; }
+    .modal.hidden { display: none; }
+    .modal-content { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 28px 28px 24px; width: 100%; max-width: 620px; position: relative; max-height: 88vh; overflow-y: auto; }
+    .modal-close { position: absolute; top: 14px; right: 16px; background: none; border: none; color: var(--text-muted); font-size: 1.2rem; cursor: pointer; }
+    .modal-title { font-size: 1rem; font-weight: 700; color: var(--text); line-height: 1.4; margin-bottom: 4px; }
+    .modal-section { margin-top: 18px; }
+    .modal-section h3 { font-size: .78rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--text-muted); margin-bottom: 10px; }
+    .demanda-badge { display: inline-block; padding: 2px 8px; border-radius: 20px; font-size: .72rem; font-weight: 600; }
+    .badge-pendente_aceite { background: rgba(245,158,11,.15); color: var(--warning); }
+    .badge-em_negociacao   { background: rgba(139,92,246,.15); color: var(--purple); }
+    .badge-aceita          { background: rgba(34,197,94,.15);  color: var(--success); }
+    .badge-em_andamento    { background: rgba(34,197,94,.15);  color: var(--success); }
+    .badge-concluida_aguardando_baixa { background: rgba(79,142,247,.15); color: var(--accent); }
+    .badge-finalizada      { background: rgba(74,74,74,.2);    color: var(--text-muted); }
+    .action-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--border); }
+    .btn-aceitar { padding: 8px 14px; background: rgba(34,197,94,.15); border: 1px solid rgba(34,197,94,.3); border-radius: 7px; color: var(--success); cursor: pointer; font-size: .85rem; font-weight: 600; font-family: inherit; }
+    .btn-concluir { padding: 8px 14px; background: rgba(79,142,247,.15); border: 1px solid rgba(79,142,247,.3); border-radius: 7px; color: var(--accent); cursor: pointer; font-size: .85rem; font-weight: 600; font-family: inherit; }
+    .btn-baixa { padding: 8px 14px; background: rgba(139,92,246,.15); border: 1px solid rgba(139,92,246,.3); border-radius: 7px; color: var(--purple); cursor: pointer; font-size: .85rem; font-weight: 600; font-family: inherit; }
+    .btn-excluir-demanda { padding: 8px 14px; background: rgba(239,68,68,.1); border: 1px solid rgba(239,68,68,.25); border-radius: 7px; color: var(--danger); cursor: pointer; font-size: .85rem; font-weight: 600; font-family: inherit; }
+    .timeline { list-style: none; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+    .timeline li { padding: 10px 12px; background: var(--surface-2); border-radius: 8px; border-left: 3px solid var(--border); }
+    .msg-tipo { font-size: .72rem; font-weight: 700; text-transform: uppercase; color: var(--text-muted); margin-right: 6px; }
+    .msg-data { font-size: .72rem; color: var(--text-muted); }
+    .msg-texto { font-size: .85rem; margin-top: 5px; line-height: 1.5; }
+    .origem-badge { display: inline-block; padding: 2px 7px; border-radius: 20px; font-size: .7rem; font-weight: 600; }
+    .origem-web { background: rgba(79,142,247,.12); color: var(--accent); }
+    .origem-whatsapp { background: rgba(0,200,117,.12); color: #00c875; }
+    .demanda-codigo { font-size:.7rem; font-weight:700; color:var(--accent); background:var(--accent-glow); padding:1px 6px; border-radius:4px; margin-right:6px; font-family:monospace; }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="header-inner">
+      <h1>📋 Gestão de Demandas</h1>
+      <span class="subtitle">via WhatsApp</span>
+      <div id="user-badge" style="display:flex;align-items:center;gap:10px;margin-left:auto"></div>
+    </div>
+  </header>
+
+  <nav class="nav-tabs">
+    <a href="/" class="nav-tab" id="nav-dashboard">Dashboard</a>
+    <a href="/calendario.html" class="nav-tab active" id="nav-calendario">📅 Calendário</a>
+    <a href="/hoje.html" class="nav-tab" id="nav-hoje">☀️ Hoje</a>
+    <a href="/configuracoes.html" class="nav-tab" id="nav-config">⚙️ Configurações</a>
+    <a href="/admin.html" class="nav-tab" id="nav-admin" style="display:none">👥 Admin</a>
+  </nav>
+
+  <main>
+    <div class="cal-header">
+      <button class="btn-icon" id="btn-prev">‹</button>
+      <span class="cal-month-label" id="cal-month-label">—</span>
+      <button class="btn-icon" id="btn-next">›</button>
+    </div>
+
+    <div class="filter-bar">
+      <label>Usuário:
+        <select id="filtro-usuario-cal">
+          <option value="">Todos</option>
+        </select>
+      </label>
+      <label>Status:
+        <select id="filtro-status-cal">
+          <option value="">Todos</option>
+          <option value="pendente_aceite">Aguardando Aceite</option>
+          <option value="em_negociacao">Em Negociação</option>
+          <option value="aceita">Aceita</option>
+          <option value="em_andamento">Em Andamento</option>
+          <option value="concluida_aguardando_baixa">Aguardando Baixa</option>
+          <option value="finalizada">Finalizada</option>
+        </select>
+      </label>
+    </div>
+
+    <div class="cal-grid" id="cal-grid">
+      <!-- Dias da semana -->
+      <div class="cal-dow">Dom</div>
+      <div class="cal-dow">Seg</div>
+      <div class="cal-dow">Ter</div>
+      <div class="cal-dow">Qua</div>
+      <div class="cal-dow">Qui</div>
+      <div class="cal-dow">Sex</div>
+      <div class="cal-dow">Sáb</div>
+    </div>
+
+    <div class="section-title">Alocação do Mês</div>
+    <div class="alocacao-grid" id="alocacao-grid"></div>
+  </main>
+
+  <!-- Modal de detalhes da demanda -->
+  <div id="modal" class="modal hidden">
+    <div class="modal-content">
+      <button class="modal-close" id="modal-close">✕</button>
+      <div id="modal-body"></div>
+    </div>
+  </div>
+
+  <script>
+    const AUTH_KEY = 'gestao_auth';
+    function getAuth()       { try { return JSON.parse(localStorage.getItem(AUTH_KEY)||'null'); } catch { return null; } }
+    function getCurrentUser(){ return getAuth()?.usuario || null; }
+    function getToken()      { return getAuth()?.token   || null; }
+    function logout()        { localStorage.removeItem(AUTH_KEY); window.location.href = '/login.html'; }
+
+    const currentUser = getCurrentUser();
+    if (!currentUser) {
+      window.location.href = '/login.html?redirect=/calendario.html';
+    } else {
+      // Show user badge
+      const userBadge = document.getElementById('user-badge');
+      userBadge.innerHTML = `
+        <span style="font-size:.85rem;color:var(--text-muted)">Olá, <strong style="color:var(--text)">${currentUser.nome.split(' ')[0]}</strong></span>
+        <button onclick="logout()" style="padding:5px 12px;background:transparent;border:1px solid var(--border);border-radius:6px;color:var(--text-muted);font-size:.8rem;cursor:pointer;font-family:inherit">Sair</button>
+      `;
+      // Show admin tab
+      if (currentUser.perfil === 'admin') {
+        document.getElementById('nav-admin').style.display = '';
+      }
+    }
+
+    async function api(path, options = {}) {
+      const token = getToken();
+      const res = await fetch(path, {
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        ...options,
+        body: options.body ? JSON.stringify(options.body) : undefined,
+      });
+      if (res.status === 401) { logout(); return; }
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ erro: 'Erro desconhecido' }));
+        throw new Error(err.erro || `HTTP ${res.status}`);
+      }
+      return res.status === 204 ? null : res.json();
+    }
+
+    function formatDate(iso) {
+      if (!iso) return '—';
+      const [y, m, d] = iso.slice(0, 10).split('-');
+      return `${d}/${m}/${y}`;
+    }
+
+    function statusLabel(s) {
+      const labels = {
+        pendente_aceite: 'Aguardando Aceite',
+        em_negociacao: 'Em Negociação',
+        aceita: 'Aceita',
+        em_andamento: 'Em Andamento',
+        concluida_aguardando_baixa: 'Aguardando Baixa',
+        finalizada: 'Finalizada',
+      };
+      return labels[s] || s;
+    }
+
+    function origemLabel(o) { return o === 'whatsapp' ? '💬 WhatsApp' : '🖥️ Web'; }
+
+    function iniciais(nome) {
+      return nome.split(' ').slice(0,2).map(p=>p[0]).join('').toUpperCase();
+    }
+
+    // ── State ──────────────────────────────────────────────────────────────────
+    let demandas = [];
+    let usuarios = [];
+    let viewYear  = new Date().getFullYear();
+    let viewMonth = new Date().getMonth(); // 0-indexed
+    const MESES = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+
+    // ── Fetch data ─────────────────────────────────────────────────────────────
+    async function carregarDados() {
+      [demandas, usuarios] = await Promise.all([
+        api('/api/demandas'),
+        api('/api/usuarios'),
+      ]);
+      if (!Array.isArray(demandas)) demandas = [];
+      popularFiltroUsuario();
+      renderCalendario();
+      renderAlocacao();
+    }
+
+    function popularFiltroUsuario() {
+      const sel = document.getElementById('filtro-usuario-cal');
+      const val = sel.value;
+      sel.innerHTML = '<option value="">Todos</option>' +
+        (usuarios||[]).map(u => `<option value="${u.id}">${u.nome}</option>`).join('');
+      sel.value = val;
+    }
+
+    // ── Filters ────────────────────────────────────────────────────────────────
+    function getDemandasFiltradas() {
+      const filtroU = document.getElementById('filtro-usuario-cal').value;
+      const filtroS = document.getElementById('filtro-status-cal').value;
+      return demandas.filter(d => {
+        if (filtroU && d.solicitante_id !== filtroU && d.responsavel_id !== filtroU) return false;
+        if (filtroS && d.status !== filtroS) return false;
+        return true;
+      });
+    }
+
+    // ── Calendar render ────────────────────────────────────────────────────────
+    function renderCalendario() {
+      const hoje = new Date().toISOString().slice(0, 10);
+      document.getElementById('cal-month-label').textContent = `${MESES[viewMonth]} ${viewYear}`;
+
+      const grid = document.getElementById('cal-grid');
+      // Remove previous day cells (keep 7 dow headers)
+      const cells = grid.querySelectorAll('.cal-day');
+      cells.forEach(c => c.remove());
+
+      const firstDay = new Date(viewYear, viewMonth, 1).getDay(); // 0=Sun
+      const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate();
+      const daysInPrev  = new Date(viewYear, viewMonth, 0).getDate();
+
+      const lista = getDemandasFiltradas();
+
+      // Build a map: "YYYY-MM-DD" -> demandas[]
+      const byDay = {};
+      lista.forEach(d => {
+        const data = d.data_acordada || d.data_entrega;
+        if (!data) return;
+        const key = data.slice(0, 10);
+        if (!byDay[key]) byDay[key] = [];
+        byDay[key].push(d);
+      });
+
+      // Prev month padding
+      for (let i = firstDay - 1; i >= 0; i--) {
+        const cell = document.createElement('div');
+        cell.className = 'cal-day other-month';
+        cell.innerHTML = `<div class="cal-day-num">${daysInPrev - i}</div>`;
+        grid.appendChild(cell);
+      }
+
+      // Current month days
+      for (let day = 1; day <= daysInMonth; day++) {
+        const ymd = `${viewYear}-${String(viewMonth+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+        const cell = document.createElement('div');
+        const dow = new Date(viewYear, viewMonth, day).getDay();
+        const isWeekend = dow === 0 || dow === 6;
+        let cls = 'cal-day';
+        if (isWeekend) cls += ' weekend';
+        if (ymd === hoje) cls += ' today';
+        cell.className = cls;
+
+        let inner = `<div class="cal-day-num">${day}</div>`;
+
+        const demands = byDay[ymd] || [];
+        demands.slice(0, 5).forEach(d => {
+          const vencida = d.status !== 'finalizada' && d.status !== 'concluida_aguardando_baixa' && ymd < hoje;
+          const badgeCls = vencida ? 'cal-badge vencida' : `cal-badge status-${d.status}`;
+          const label = `${d.codigo || ''} ${(d.descricao||'').slice(0,28)}`;
+          inner += `<span class="${badgeCls}" data-id="${d.id}" title="${(d.descricao||'').replace(/"/g,'&quot;')}">${label}</span>`;
+        });
+        if (demands.length > 5) {
+          inner += `<span style="font-size:.65rem;color:var(--text-muted);margin-top:2px;display:block">+${demands.length-5} mais</span>`;
+        }
+
+        cell.innerHTML = inner;
+        grid.appendChild(cell);
+      }
+
+      // Next month padding to complete last row
+      const totalCells = firstDay + daysInMonth;
+      const remainder = totalCells % 7;
+      const nextPad = remainder === 0 ? 0 : 7 - remainder;
+      for (let i = 1; i <= nextPad; i++) {
+        const cell = document.createElement('div');
+        cell.className = 'cal-day other-month';
+        cell.innerHTML = `<div class="cal-day-num">${i}</div>`;
+        grid.appendChild(cell);
+      }
+
+      // Click badges to open modal
+      grid.querySelectorAll('.cal-badge[data-id]').forEach(badge => {
+        badge.addEventListener('click', e => {
+          e.stopPropagation();
+          abrirModal(badge.dataset.id);
+        });
+      });
+    }
+
+    // ── Alocação ───────────────────────────────────────────────────────────────
+    function renderAlocacao() {
+      const lista = getDemandasFiltradas();
+      const monthStr = `${viewYear}-${String(viewMonth+1).padStart(2,'0')}`;
+
+      // Count demands per responsavel that have data_entrega or data_acordada in this month
+      const counts = {};
+      lista.forEach(d => {
+        const data = d.data_acordada || d.data_entrega;
+        if (!data || !data.startsWith(monthStr)) return;
+        const rid = d.responsavel_id;
+        counts[rid] = (counts[rid] || 0) + 1;
+      });
+
+      const grid = document.getElementById('alocacao-grid');
+      const entries = Object.entries(counts).sort((a,b) => b[1]-a[1]);
+
+      if (entries.length === 0) {
+        grid.innerHTML = `<p style="color:var(--text-muted);font-size:.85rem">Nenhuma entrega neste mês.</p>`;
+        return;
+      }
+
+      grid.innerHTML = entries.map(([uid, count]) => {
+        const u = (usuarios||[]).find(x => x.id === uid);
+        const nome = u ? u.nome : 'Desconhecido';
+        return `<div class="alocacao-card">
+          <div class="alocacao-nome">${iniciais(nome)} ${nome}</div>
+          <div class="alocacao-num">${count}</div>
+          <div class="alocacao-label">entrega(s) neste mês</div>
+        </div>`;
+      }).join('');
+    }
+
+    // ── Modal ──────────────────────────────────────────────────────────────────
+    async function abrirModal(id) {
+      const modal = document.getElementById('modal');
+      const body  = document.getElementById('modal-body');
+      modal.classList.remove('hidden');
+      body.innerHTML = '<p style="color:var(--text-muted)">Carregando...</p>';
+
+      try {
+        const [demanda, mensagens] = await Promise.all([
+          api(`/api/demandas/${id}`),
+          api(`/api/demandas/${id}/mensagens`),
+        ]);
+
+        body.innerHTML = `
+          <div class="modal-title">${demanda.codigo ? `<span class="demanda-codigo">${demanda.codigo}</span>` : ''}${demanda.descricao}</div>
+          <div style="margin-top:6px">
+            <span class="demanda-badge badge-${demanda.status}">${statusLabel(demanda.status)}</span>
+          </div>
+          <div class="modal-section">
+            <h3>Detalhes</h3>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:.88rem">
+              <div><strong>Solicitante:</strong> ${demanda.solicitante?.nome || '—'}</div>
+              <div><strong>Responsável:</strong> ${demanda.responsavel?.nome || '—'}</div>
+              <div><strong>Prazo de entrega:</strong> ${formatDate(demanda.data_entrega)}${demanda.horario_entrega ? ` às ${demanda.horario_entrega}` : ''}</div>
+              <div><strong>Prazo acordado:</strong> ${formatDate(demanda.data_acordada)}</div>
+              <div><strong>Criado em:</strong> ${formatDate(demanda.criado_em)}</div>
+              <div><strong>Atualizado:</strong> ${formatDate(demanda.atualizado_em)}</div>
+              <div><strong>Origem:</strong> <span class="origem-badge origem-${demanda.origem||'web'}">${origemLabel(demanda.origem)}</span></div>
+            </div>
+          </div>
+          <div class="modal-section">
+            <h3>Histórico</h3>
+            ${mensagens.length === 0
+              ? '<p style="color:var(--text-muted);font-size:.85rem">Sem mensagens.</p>'
+              : `<ul class="timeline">${mensagens.map(m => {
+                  const tipo = {criacao:'📋 Criação',resposta:'💬 Resposta',conclusao:'🎉 Conclusão',baixa:'✔️ Baixa'}[m.tipo]||m.tipo;
+                  return `<li><span class="msg-tipo">${tipo}</span><span class="msg-data">${formatDate(m.enviado_em)}</span><div class="msg-texto">${m.conteudo}</div></li>`;
+                }).join('')}</ul>`
+            }
+          </div>
+          <div class="action-row" id="acoes-demanda">
+            ${renderAcoes(demanda)}
+          </div>
+        `;
+
+        document.getElementById('acoes-demanda').addEventListener('click', async e => {
+          const btn = e.target.closest('[data-acao]');
+          if (!btn || btn.disabled) return;
+          const acao = btn.dataset.acao;
+          btn.disabled = true;
+          const txt = btn.textContent;
+          btn.textContent = '⏳';
+          try {
+            await api(`/api/demandas/${id}/${acao}`, { method:'POST', body:{ usuario_id: currentUser?.id } });
+            fecharModal();
+            await carregarDados();
+          } catch(e) {
+            alert('Erro: ' + e.message);
+          } finally {
+            if (btn.isConnected) { btn.disabled = false; btn.textContent = txt; }
+          }
+        });
+
+      } catch(e) {
+        body.innerHTML = `<p style="color:var(--danger)">Erro: ${e.message}</p>`;
+      }
+    }
+
+    function renderAcoes(d) {
+      if (!currentUser) return '';
+      const ehAdmin       = currentUser.perfil === 'admin';
+      const ehResponsavel = currentUser.id === d.responsavel_id;
+      const ehSolicitante = currentUser.id === d.solicitante_id;
+      const podeResp = ehResponsavel || ehAdmin;
+      const podeSoli = ehSolicitante || ehAdmin;
+      const acoes = [];
+      if (podeResp && d.status === 'pendente_aceite') acoes.push(`<button class="btn-aceitar" data-acao="aceitar">✅ Aceitar</button>`);
+      if (podeSoli && d.status === 'em_negociacao')   acoes.push(`<button class="btn-aceitar" data-acao="aceitar">✅ Aceitar novo prazo</button>`);
+      if (podeResp && ['aceita','em_andamento'].includes(d.status)) acoes.push(`<button class="btn-concluir" data-acao="concluir">🎉 Concluir</button>`);
+      if (podeSoli && d.status === 'concluida_aguardando_baixa') acoes.push(`<button class="btn-baixa" data-acao="baixa">✔️ Dar Baixa</button>`);
+      if (acoes.length === 0 && d.status !== 'finalizada') acoes.push(`<span style="font-size:.82rem;color:var(--text-muted)">Apenas visualização</span>`);
+      return acoes.join('');
+    }
+
+    function fecharModal() {
+      document.getElementById('modal').classList.add('hidden');
+    }
+
+    // ── Navigation ─────────────────────────────────────────────────────────────
+    document.getElementById('btn-prev').addEventListener('click', () => {
+      viewMonth--;
+      if (viewMonth < 0) { viewMonth = 11; viewYear--; }
+      renderCalendario();
+      renderAlocacao();
+    });
+
+    document.getElementById('btn-next').addEventListener('click', () => {
+      viewMonth++;
+      if (viewMonth > 11) { viewMonth = 0; viewYear++; }
+      renderCalendario();
+      renderAlocacao();
+    });
+
+    document.getElementById('filtro-usuario-cal').addEventListener('change', () => {
+      renderCalendario();
+      renderAlocacao();
+    });
+
+    document.getElementById('filtro-status-cal').addEventListener('change', () => {
+      renderCalendario();
+      renderAlocacao();
+    });
+
+    document.getElementById('modal-close').addEventListener('click', fecharModal);
+    document.getElementById('modal').addEventListener('click', e => {
+      if (e.target === e.currentTarget) fecharModal();
+    });
+
+    // ── Init ───────────────────────────────────────────────────────────────────
+    carregarDados();
+  </script>
+</body>
+</html>
