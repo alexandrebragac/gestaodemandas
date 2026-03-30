@@ -85,7 +85,7 @@
       <!-- Painel principal: lista de demandas -->
       <section class="main-panel">
         <div class="filter-bar">
-          <label>Filtrar por status:
+          <label>Status:
             <select id="filtro-status">
               <option value="">Todos (exceto finalizados)</option>
               <option value="pendente_aceite">Aguardando Aceite</option>
@@ -94,6 +94,11 @@
               <option value="em_andamento">Em Andamento</option>
               <option value="concluida_aguardando_baixa">Aguardando Baixa</option>
               <option value="finalizada">Finalizada</option>
+            </select>
+          </label>
+          <label>Usuário:
+            <select id="filtro-usuario">
+              <option value="">Todos</option>
             </select>
           </label>
           <button class="btn-icon" id="btn-refresh" title="Atualizar">↻</button>

@@ -110,7 +110,8 @@ function showMsg(elId, msg, type = 'ok') {
 let currentUser = null;
 let usuarios = [];
 let demandas = [];
-let filtroStatus = '';
+let filtroStatus  = '';
+let filtroUsuario = '';
 
 // ── Carregamento inicial ─────────────────────────────────────────────────────
 
@@ -125,6 +126,9 @@ async function carregarDemandas() {
   demandas = await api(`/api/demandas${qs}`);
   if (!filtroStatus) {
     demandas = demandas.filter(d => d.status !== 'finalizada');
+  }
+  if (filtroUsuario) {
+    demandas = demandas.filter(d => d.solicitante_id === filtroUsuario || d.responsavel_id === filtroUsuario);
   }
   renderDemandas();
   renderUsuariosOverview();
@@ -363,6 +367,14 @@ function popularSelects() {
   // Pré-seleciona o usuário logado como solicitante
   if (currentUser) {
     document.getElementById('solicitante').value = currentUser.id;
+  }
+
+  // Popula filtro por usuário
+  const filtroEl = document.getElementById('filtro-usuario');
+  if (filtroEl) {
+    const val = filtroEl.value;
+    filtroEl.innerHTML = `<option value="">Todos</option>` + opts;
+    filtroEl.value = val; // mantém seleção atual
   }
 }
 
@@ -629,6 +641,11 @@ document.getElementById('form-usuario').addEventListener('submit', async (e) => 
 
 document.getElementById('filtro-status').addEventListener('change', async (e) => {
   filtroStatus = e.target.value;
+  await carregarDemandas();
+});
+
+document.getElementById('filtro-usuario').addEventListener('change', async (e) => {
+  filtroUsuario = e.target.value;
   await carregarDemandas();
 });
 
