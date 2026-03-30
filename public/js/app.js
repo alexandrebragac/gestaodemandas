@@ -582,8 +582,7 @@ async function excluirDemanda(id, descricao, btn) {
           <button id="conf-confirmar" style="padding:7px 18px;background:rgba(239,68,68,.15);border:1px solid rgba(239,68,68,.3);border-radius:6px;color:#ef4444;cursor:pointer;font-size:.85rem;font-weight:600;font-family:inherit">Excluir</button>
         </div>
       </div>`;
-    const modalContent = document.querySelector('.modal-content');
-    modalContent.style.position = 'relative';
+    const modalContent = document.querySelector('#modal .modal-content');
     modalContent.appendChild(overlay);
     overlay.querySelector('#conf-confirmar').onclick = () => { overlay.remove(); resolve(true); };
     overlay.querySelector('#conf-cancelar').onclick  = () => { overlay.remove(); resolve(false); };
