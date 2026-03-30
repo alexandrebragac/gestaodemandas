@@ -517,23 +517,26 @@ async function abrirModal(id) {
 function renderAcoes(d) {
   if (!currentUser) return '';
 
+  const ehAdmin      = currentUser.perfil === 'admin';
   const ehResponsavel = currentUser.id === d.responsavel_id;
   const ehSolicitante = currentUser.id === d.solicitante_id;
+  const podeResponsavel = ehResponsavel || ehAdmin;
+  const podeSolicitante = ehSolicitante || ehAdmin;
   const acoes = [];
 
-  // Responsável: aceitar e concluir
-  if (ehResponsavel && ['pendente_aceite', 'em_negociacao'].includes(d.status)) {
+  // Aceitar / concluir (responsável ou admin)
+  if (podeResponsavel && ['pendente_aceite', 'em_negociacao'].includes(d.status)) {
     acoes.push(`<button class="btn-aceitar" data-acao="aceitar">✅ Aceitar</button>`);
   }
-  if (ehResponsavel && ['aceita', 'em_andamento'].includes(d.status)) {
+  if (podeResponsavel && ['aceita', 'em_andamento'].includes(d.status)) {
     acoes.push(`<button class="btn-concluir" data-acao="concluir">🎉 Concluir</button>`);
   }
 
-  // Solicitante: dar baixa e excluir
-  if (ehSolicitante && d.status === 'concluida_aguardando_baixa') {
+  // Dar baixa / excluir (solicitante ou admin)
+  if (podeSolicitante && d.status === 'concluida_aguardando_baixa') {
     acoes.push(`<button class="btn-baixa" data-acao="baixa">✔️ Dar Baixa</button>`);
   }
-  if (ehSolicitante && d.status !== 'finalizada') {
+  if (podeSolicitante && d.status !== 'finalizada') {
     acoes.push(`<button class="btn-excluir-demanda" data-acao="excluir-demanda">🗑️ Excluir</button>`);
   }
 

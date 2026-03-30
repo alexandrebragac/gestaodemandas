@@ -139,7 +139,8 @@ router.post('/:id/aceitar', async (req, res) => {
 
   const { usuario_id } = req.body;
   if (usuario_id && usuario_id !== demanda.responsavel_id) {
-    return res.status(403).json({ erro: 'Apenas o responsável pode aceitar esta demanda' });
+    const ator = db.prepare('SELECT perfil FROM usuarios WHERE id = ?').get(usuario_id);
+    if (ator?.perfil !== 'admin') return res.status(403).json({ erro: 'Apenas o responsável pode aceitar esta demanda' });
   }
 
   if (![STATUS.PENDENTE_ACEITE, STATUS.EM_NEGOCIACAO].includes(demanda.status)) {
@@ -198,7 +199,8 @@ router.post('/:id/concluir', async (req, res) => {
 
   const { usuario_id } = req.body;
   if (usuario_id && usuario_id !== demanda.responsavel_id) {
-    return res.status(403).json({ erro: 'Apenas o responsável pode concluir esta demanda' });
+    const ator = db.prepare('SELECT perfil FROM usuarios WHERE id = ?').get(usuario_id);
+    if (ator?.perfil !== 'admin') return res.status(403).json({ erro: 'Apenas o responsável pode concluir esta demanda' });
   }
 
   if (![STATUS.ACEITA, STATUS.EM_ANDAMENTO].includes(demanda.status)) {
@@ -233,7 +235,8 @@ router.post('/:id/baixa', async (req, res) => {
 
   const { usuario_id } = req.body;
   if (usuario_id && usuario_id !== demanda.solicitante_id) {
-    return res.status(403).json({ erro: 'Apenas o solicitante pode dar baixa nesta demanda' });
+    const ator = db.prepare('SELECT perfil FROM usuarios WHERE id = ?').get(usuario_id);
+    if (ator?.perfil !== 'admin') return res.status(403).json({ erro: 'Apenas o solicitante pode dar baixa nesta demanda' });
   }
 
   if (demanda.status !== STATUS.CONCLUIDA_AGUARDANDO_BAIXA) {
