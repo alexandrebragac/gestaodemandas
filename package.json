@@ -20,6 +20,7 @@
     "jsonwebtoken": "^9.0.3",
     "node-cron": "^3.0.3",
     "nodemailer": "^8.0.4",
+    "resend": "^6.10.0",
     "twilio": "^5.0.4",
     "uuid": "^9.0.1"
   },

@@ -1,16 +1,22 @@
 /**
  * Serviço de notificações por email.
- * Usa nodemailer com qualquer servidor SMTP (Gmail, Outlook, SMTP genérico).
- *
- * Variáveis de ambiente necessárias:
- *   SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, SMTP_FROM
- *   (SMTP_SECURE = 'true' para TLS direto, padrão: false + STARTTLS)
+ * Usa Resend (API HTTP) se RESEND_API_KEY estiver definido,
+ * caso contrário usa nodemailer SMTP (para desenvolvimento local).
  */
 
 const nodemailer = require('nodemailer');
 const crypto = require('crypto');
 
 let _transport = null;
+let _resend = null;
+
+function getResend() {
+  if (_resend) return _resend;
+  if (!process.env.RESEND_API_KEY) return null;
+  const { Resend } = require('resend');
+  _resend = new Resend(process.env.RESEND_API_KEY);
+  return _resend;
+}
 
 function getTransport() {
   if (_transport) return _transport;
@@ -91,17 +97,31 @@ function formatarData(iso) {
 // ── Envio ─────────────────────────────────────────────────────────────────────
 
 async function enviarEmail(destinatario, assunto, html) {
-  const transport = getTransport();
   const to = destinatario.email;
-  if (!to) return; // usuário sem email cadastrado
+  if (!to) return;
 
+  // Prioriza Resend (API HTTP) — funciona em qualquer servidor
+  const resend = getResend();
+  if (resend) {
+    try {
+      const { error } = await resend.emails.send({ from: fromAddr(), to, subject: assunto, html });
+      if (error) throw new Error(error.message);
+      console.log(`[Email] Enviado via Resend para ${to}`);
+    } catch (err) {
+      console.error(`[Email] Erro Resend para ${to}:`, err.message);
+    }
+    return;
+  }
+
+  // Fallback: SMTP (desenvolvimento local)
+  const transport = getTransport();
   if (!transport) {
     console.log(`[Email SIMULADO] Para: ${to} | Assunto: ${assunto}`);
     return;
   }
   try {
     const info = await transport.sendMail({ from: fromAddr(), to, subject: assunto, html });
-    console.log(`[Email] Enviado para ${to}: ${info.messageId}`);
+    console.log(`[Email] Enviado via SMTP para ${to}: ${info.messageId}`);
   } catch (err) {
     console.error(`[Email] Erro ao enviar para ${to}:`, err.message);
   }
