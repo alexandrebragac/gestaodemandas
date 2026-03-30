@@ -597,6 +597,10 @@ document.getElementById('form-editar-usuario').addEventListener('submit', async 
 
 document.getElementById('form-demanda').addEventListener('submit', async (e) => {
   e.preventDefault();
+  const btn = e.target.querySelector('button[type="submit"], .btn-primary');
+  if (btn?.disabled) return; // evita duplo envio
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Criando...'; }
+
   const body = {
     solicitante_id: document.getElementById('solicitante').value,
     responsavel_id: document.getElementById('responsavel').value,
@@ -621,6 +625,8 @@ document.getElementById('form-demanda').addEventListener('submit', async (e) => 
     await carregarDemandas();
   } catch (err) {
     showMsg('form-msg', '❌ ' + err.message, 'err');
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = 'Criar Demanda'; }
   }
 });
 
