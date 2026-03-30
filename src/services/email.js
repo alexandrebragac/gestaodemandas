@@ -24,6 +24,7 @@ function getTransport() {
     port: parseInt(SMTP_PORT || '587'),
     secure: process.env.SMTP_SECURE === 'true',
     auth: { user: SMTP_USER, pass: SMTP_PASS },
+    family: 4, // força IPv4 (Railway não suporta IPv6 para SMTP)
   });
   return _transport;
 }
