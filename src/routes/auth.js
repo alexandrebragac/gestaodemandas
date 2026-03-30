@@ -182,6 +182,23 @@ router.put('/perfil/:id', authMiddleware, adminOnly, (req, res) => {
   res.json({ ok: true });
 });
 
+// POST /api/auth/setup-admin — cria admin inicial (só funciona se não existir nenhum admin)
+router.post('/setup-admin', async (req, res) => {
+  const { nome, email, senha, telefone, setup_key } = req.body;
+  const SETUP_KEY = process.env.SETUP_KEY || '';
+  if (!SETUP_KEY || setup_key !== SETUP_KEY) {
+    return res.status(403).json({ erro: 'setup_key inválida' });
+  }
+  const db = getDb();
+  const jaTemAdmin = db.prepare("SELECT id FROM usuarios WHERE perfil = 'admin' LIMIT 1").get();
+  if (jaTemAdmin) return res.status(400).json({ erro: 'Já existe um admin cadastrado' });
+  const { v4: uuidv4 } = require('uuid');
+  const hash = await bcrypt.hash(senha, 10);
+  db.prepare('INSERT INTO usuarios (id, nome, email, telefone_whatsapp, senha_hash, perfil, canal) VALUES (?,?,?,?,?,?,?)')
+    .run(uuidv4(), nome, email, telefone || '00000000000', hash, 'admin', 'email');
+  res.json({ ok: true, mensagem: 'Admin criado com sucesso!' });
+});
+
 module.exports = router;
 module.exports.authMiddleware = authMiddleware;
 module.exports.adminOnly = adminOnly;
