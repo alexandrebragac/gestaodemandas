@@ -734,8 +734,26 @@ async function handleNovoPrazoComData(usuario, demandaId, novaData, telefone, re
     return res.status(200).send('OK');
   }
 
+  const prazoOriginal = demanda.data_acordada || demanda.data_entrega;
+  const atrasado = novaData > prazoOriginal;
+
+  // Justificativa obrigatória se nova data for após o prazo original
+  if (atrasado && !justificativa) {
+    setSessao(telefone, { fluxo: 'aguardando_justificativa_prazo', demandaId: demanda.id, novaData, pergunta_atual: '' });
+    await whatsappService.enviarMensagem(usuario,
+      `⚠️ O novo prazo (${formatarData(novaData)}) é posterior ao prazo original (${formatarData(prazoOriginal)}).\n\n*Justifique o motivo do atraso:*\n_Ex: imprevisto, dependência externa, retrabalho_`
+    );
+    return res.status(200).send('OK');
+  }
+
   db.prepare(`UPDATE demandas SET status='em_negociacao', data_acordada=?, atualizado_em=datetime('now') WHERE id=?`)
     .run(novaData, demanda.id);
+
+  // Registra no histórico
+  const { v4: uuidv4 } = require('uuid');
+  const historico = `Novo prazo proposto: ${formatarData(prazoOriginal)} → ${formatarData(novaData)}${justificativa ? `\nMotivo: ${justificativa}` : ''}`;
+  db.prepare(`INSERT INTO mensagens (id, demanda_id, remetente_id, tipo, conteudo) VALUES (?,?,?,'reagendamento',?)`)
+    .run(uuidv4(), demanda.id, usuario.id, historico);
 
   const ehResponsavel = demanda.responsavel_id === usuario.id;
   const outro = db.prepare('SELECT * FROM usuarios WHERE id=?').get(ehResponsavel ? demanda.solicitante_id : demanda.responsavel_id);
@@ -820,11 +838,24 @@ async function fluxoJustificativaPrazo(usuario, texto, sessao, telefone, res) {
     await whatsappService.enviarMensagem(usuario, '❌ Cancelado.');
     return res.status(200).send('OK');
   }
+
+  const justificativa = texto.trim();
+  if (!justificativa || justificativa.length < 5) {
+    await whatsappService.enviarMensagem(usuario, '⚠️ Por favor, descreva o motivo com mais detalhes.\n\n*0* — Cancelar');
+    return res.status(200).send('OK');
+  }
+
+  // Se já temos a novaData na sessão (atraso detectado), processa direto
+  if (sessao.novaData) {
+    setSessao(telefone, { ...sessao, justificativa, fluxo: 'aguardando_data_prazo' });
+    return await handleNovoPrazoComData(usuario, sessao.demandaId, sessao.novaData, telefone, res);
+  }
+
   const perguntaData = `📅 *Qual é o novo prazo?*\nFormato: *DD/MM/AAAA*\nEx: 30/04/2026\n\n*0* — Cancelar`;
   setSessao(telefone, {
     fluxo: 'aguardando_data_prazo',
     demandaId: sessao.demandaId || null,
-    justificativa: texto.trim(),
+    justificativa,
     pergunta_atual: perguntaData,
   });
   await whatsappService.enviarMensagem(usuario, perguntaData);

@@ -483,12 +483,16 @@ async function abrirModal(id) {
         <h3>Histórico</h3>
         ${mensagens.length === 0
           ? '<p style="color:var(--muted);font-size:.85rem">Sem mensagens ainda.</p>'
-          : `<ul class="timeline">${mensagens.map(m => `
-            <li>
-              <span class="msg-tipo">${m.tipo}</span>
+          : `<ul class="timeline">${mensagens.map(m => {
+              const tipoLabel = {
+                criacao: '📋 Criação', resposta: '💬 Resposta', aceite: '✅ Aceite',
+                baixa: '✔️ Baixa', reagendamento: '📅 Reagendamento', concluida: '🎉 Conclusão'
+              }[m.tipo] || m.tipo;
+              return `<li>
+              <span class="msg-tipo">${tipoLabel}</span>
               <span class="msg-data">${formatDate(m.enviado_em)}</span>
               <div class="msg-texto">${m.conteudo}</div>
-            </li>`).join('')}</ul>`
+            </li>`;}).join('')}</ul>`
         }
       </div>
 

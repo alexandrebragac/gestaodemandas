@@ -82,6 +82,7 @@ router.get('/:demandaId/:acao', async (req, res) => {
 
     if (acao === 'pedir-prazo') {
       const appUrl = process.env.APP_URL || 'http://localhost:3000';
+      const prazoOriginal = demanda.data_acordada || demanda.data_entrega;
       // Mostra formulário para o responsável propor nova data
       return res.send(`<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8">
       <style>
@@ -98,6 +99,9 @@ router.get('/:demandaId/:acao', async (req, res) => {
         .msg{font-size:.82rem;margin-top:10px;text-align:center;min-height:18px}
         .msg.ok{color:#22c55e}.msg.err{color:#ef4444}
         a{color:#4f8ef7;text-decoration:none;font-size:.82rem}
+        .aviso-atraso{background:#2a1a0a;border:1px solid #7c4a00;border-radius:7px;padding:10px 12px;font-size:.82rem;color:#f59e0b;margin-bottom:12px;display:none}
+        label.obrigatorio{color:#ef4444}
+        label.obrigatorio::after{content:' *';color:#ef4444}
       </style></head><body>
       <div class="box">
         <h2>📅 Propor novo prazo</h2>
@@ -105,18 +109,42 @@ router.get('/:demandaId/:acao', async (req, res) => {
         <div class="atividade">"${demanda.descricao}"</div>
         <label>Nova data de entrega</label>
         <input type="date" id="nova-data" min="${new Date().toISOString().slice(0,10)}" />
-        <label>Motivo (opcional)</label>
+        <div class="aviso-atraso" id="aviso-atraso">⚠️ A data selecionada é posterior ao prazo original. É obrigatório informar o motivo do atraso.</div>
+        <label id="label-motivo">Motivo (opcional)</label>
         <textarea id="motivo" rows="3" placeholder="Explique brevemente o motivo..."></textarea>
         <button id="btn-enviar">Enviar proposta</button>
         <div class="msg" id="msg"></div>
         <p style="text-align:center;margin-top:16px"><a href="${appUrl}">Abrir sistema</a></p>
       </div>
       <script>
+        const PRAZO_ORIGINAL = '${prazoOriginal}';
+        const novaDataInput = document.getElementById('nova-data');
+        const labelMotivo = document.getElementById('label-motivo');
+        const avisoAtraso = document.getElementById('aviso-atraso');
+
+        function verificarAtraso() {
+          const val = novaDataInput.value;
+          if (val && PRAZO_ORIGINAL && val > PRAZO_ORIGINAL) {
+            avisoAtraso.style.display = 'block';
+            labelMotivo.textContent = 'Motivo do atraso (obrigatório)';
+            labelMotivo.classList.add('obrigatorio');
+          } else {
+            avisoAtraso.style.display = 'none';
+            labelMotivo.textContent = 'Motivo (opcional)';
+            labelMotivo.classList.remove('obrigatorio');
+          }
+        }
+
+        novaDataInput.addEventListener('change', verificarAtraso);
+
         document.getElementById('btn-enviar').addEventListener('click', async () => {
-          const novaData = document.getElementById('nova-data').value;
+          const novaData = novaDataInput.value;
           const motivo   = document.getElementById('motivo').value;
           const msg = document.getElementById('msg');
           if (!novaData) { msg.textContent = 'Selecione uma data.'; msg.className='msg err'; return; }
+          if (PRAZO_ORIGINAL && novaData > PRAZO_ORIGINAL && (!motivo || motivo.trim().length < 5)) {
+            msg.textContent = 'O motivo do atraso é obrigatório (mínimo 5 caracteres).'; msg.className='msg err'; return;
+          }
           const btn = document.getElementById('btn-enviar');
           btn.disabled = true; btn.textContent = 'Enviando...';
           try {
@@ -163,13 +191,21 @@ router.post('/:demandaId/pedir-prazo-confirmar', async (req, res) => {
   const demanda = db.prepare('SELECT * FROM demandas WHERE id = ?').get(demandaId);
   if (!demanda) return res.status(404).json({ erro: 'Atividade não encontrada.' });
 
+  const prazoOriginal = demanda.data_acordada || demanda.data_entrega;
+  const atrasado = nova_data > prazoOriginal;
+  if (atrasado && (!motivo || motivo.trim().length < 5)) {
+    return res.status(400).json({ erro: 'O novo prazo é posterior ao original. O motivo do atraso é obrigatório (mínimo 5 caracteres).' });
+  }
+
   const responsavel = db.prepare('SELECT * FROM usuarios WHERE id = ?').get(demanda.responsavel_id);
   const solicitante = db.prepare('SELECT * FROM usuarios WHERE id = ?').get(demanda.solicitante_id);
 
-  db.prepare(`UPDATE demandas SET status='em_negociacao', atualizado_em=datetime('now') WHERE id=?`).run(demandaId);
-  db.prepare(`INSERT INTO mensagens (id, demanda_id, remetente_id, tipo, conteudo) VALUES (?,?,?,'resposta',?)`).run(
-    uuidv4(), demandaId, demanda.responsavel_id,
-    `Novo prazo proposto via email: ${nova_data}${motivo ? `. Motivo: ${motivo}` : ''}`
+  db.prepare(`UPDATE demandas SET status='em_negociacao', data_acordada=?, atualizado_em=datetime('now') WHERE id=?`).run(nova_data, demandaId);
+
+  const formatarDataHist = iso => { const [y,m,d] = iso.slice(0,10).split('-'); return `${d}/${m}/${y}`; };
+  const historico = `Novo prazo proposto via email: ${formatarDataHist(prazoOriginal)} → ${formatarDataHist(nova_data)}${motivo ? `\nMotivo: ${motivo}` : ''}`;
+  db.prepare(`INSERT INTO mensagens (id, demanda_id, remetente_id, tipo, conteudo) VALUES (?,?,?,'reagendamento',?)`).run(
+    uuidv4(), demandaId, demanda.responsavel_id, historico
   );
 
   const demandaAtualizada = { ...demanda, nova_data, observacao: motivo };
