@@ -10,6 +10,7 @@ function getClient() {
     console.warn('[WhatsApp] Twilio não configurado — mensagens simuladas no log.');
     return null;
   }
+  console.log(`[WhatsApp] Inicializando Twilio SID=${TWILIO_ACCOUNT_SID?.slice(0,8)}...`);
   const twilio = require('twilio');
   twilioClient = twilio(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN);
   return twilioClient;
@@ -87,6 +88,8 @@ async function enviarMensagem(destinatario, mensagem, { comMenu = false } = {}) 
   const menu = comMenu ? gerarMenuContextual(destinatario) : '';
   const corpo = mensagem + menu;
 
+  console.log(`[WhatsApp] Tentando enviar para ${to} (canal: ${destinatario.canal})`);
+
   if (!client) {
     console.log(`[WhatsApp SIMULADO] Para: ${to}\n${corpo}\n${'─'.repeat(40)}`);
     return;
@@ -95,7 +98,7 @@ async function enviarMensagem(destinatario, mensagem, { comMenu = false } = {}) 
     const msg = await client.messages.create({ from, to, body: corpo });
     console.log(`[WhatsApp] Mensagem enviada para ${to}: ${msg.sid}`);
   } catch (err) {
-    console.error(`[WhatsApp] Erro ao enviar para ${to}:`, err.message);
+    console.error(`[WhatsApp] Erro ao enviar para ${to}:`, err.message, err.code);
     throw err;
   }
 }

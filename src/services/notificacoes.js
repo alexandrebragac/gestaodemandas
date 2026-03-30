@@ -11,6 +11,7 @@ const emailService    = require('./email');
 
 async function dispatch(usuario, fnWhatsapp, fnEmail, ...args) {
   const canal = usuario?.canal || 'whatsapp';
+  console.log(`[Notificações] dispatch → ${usuario?.nome} | canal: ${canal} | tel: ${usuario?.telefone_whatsapp} | email: ${usuario?.email}`);
   const resultado = { whatsapp: null, email: null };
 
   if (canal === 'whatsapp' || canal === 'ambos') {
