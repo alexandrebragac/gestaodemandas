@@ -535,10 +535,15 @@ function renderAcoes(d) {
   const podeSolicitante = ehSolicitante || ehAdmin;
   const acoes = [];
 
-  // Aceitar / concluir (responsável ou admin)
-  if (podeResponsavel && ['pendente_aceite', 'em_negociacao'].includes(d.status)) {
+  // Aceitar demanda (responsável aceita quando pendente_aceite)
+  if (podeResponsavel && d.status === 'pendente_aceite') {
     acoes.push(`<button class="btn-aceitar" data-acao="aceitar">✅ Aceitar</button>`);
   }
+  // Aceitar novo prazo proposto (solicitante aceita quando em_negociacao)
+  if (podeSolicitante && d.status === 'em_negociacao') {
+    acoes.push(`<button class="btn-aceitar" data-acao="aceitar">✅ Aceitar novo prazo</button>`);
+  }
+  // Concluir (responsável só pode após aceite)
   if (podeResponsavel && ['aceita', 'em_andamento'].includes(d.status)) {
     acoes.push(`<button class="btn-concluir" data-acao="concluir">🎉 Concluir</button>`);
   }

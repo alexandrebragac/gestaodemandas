@@ -138,16 +138,27 @@ router.post('/:id/aceitar', async (req, res) => {
   if (!demanda) return res.status(404).json({ erro: 'Demanda não encontrada' });
 
   const { usuario_id } = req.body;
-  if (usuario_id && usuario_id !== demanda.responsavel_id) {
-    const ator = db.prepare('SELECT perfil FROM usuarios WHERE id = ?').get(usuario_id);
-    if (ator?.perfil !== 'admin') return res.status(403).json({ erro: 'Apenas o responsável pode aceitar esta demanda' });
-  }
 
   if (![STATUS.PENDENTE_ACEITE, STATUS.EM_NEGOCIACAO].includes(demanda.status)) {
     return res.status(400).json({ erro: `Não é possível aceitar uma demanda com status "${demanda.status}"` });
   }
 
-  const dataAcordada = req.body.data_acordada || demanda.data_entrega;
+  if (usuario_id) {
+    const ator = db.prepare('SELECT perfil FROM usuarios WHERE id = ?').get(usuario_id);
+    const ehAdmin = ator?.perfil === 'admin';
+    if (!ehAdmin) {
+      // pendente_aceite → somente o responsável aceita a demanda
+      if (demanda.status === STATUS.PENDENTE_ACEITE && usuario_id !== demanda.responsavel_id) {
+        return res.status(403).json({ erro: 'Apenas o responsável pode aceitar esta demanda' });
+      }
+      // em_negociacao → somente o solicitante aceita o novo prazo proposto
+      if (demanda.status === STATUS.EM_NEGOCIACAO && usuario_id !== demanda.solicitante_id) {
+        return res.status(403).json({ erro: 'Apenas o solicitante pode aceitar o novo prazo proposto' });
+      }
+    }
+  }
+
+  const dataAcordada = req.body.data_acordada || demanda.data_acordada || demanda.data_entrega;
   db.prepare(`
     UPDATE demandas SET status = 'aceita', data_acordada = ?, atualizado_em = datetime('now') WHERE id = ?
   `).run(dataAcordada, demanda.id);
