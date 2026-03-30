@@ -149,12 +149,30 @@ app.use((err, req, res, next) => {
   res.status(500).json({ erro: err.message || 'Erro interno' });
 });
 
+// Cria admin inicial se INIT_ADMIN_EMAIL e INIT_ADMIN_SENHA estiverem definidos e não houver nenhum admin
+async function criarAdminInicial() {
+  const email = process.env.INIT_ADMIN_EMAIL;
+  const senha = process.env.INIT_ADMIN_SENHA;
+  if (!email || !senha) return;
+  const jaTemAdmin = db.prepare("SELECT id FROM usuarios WHERE perfil = 'admin' LIMIT 1").get();
+  if (jaTemAdmin) return;
+  const bcrypt = require('bcryptjs');
+  const { v4: uuidv4 } = require('uuid');
+  const hash = await bcrypt.hash(senha, 10);
+  const nome = process.env.INIT_ADMIN_NOME || 'Admin';
+  const telefone = process.env.INIT_ADMIN_TELEFONE || '00000000000';
+  db.prepare('INSERT INTO usuarios (id, nome, email, telefone_whatsapp, senha_hash, perfil, canal) VALUES (?,?,?,?,?,?,?)')
+    .run(uuidv4(), nome, email, telefone, hash, 'admin', 'email');
+  console.log(`[Setup] Admin criado: ${email}`);
+}
+
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
+app.listen(PORT, async () => {
   console.log(`\n🚀 Servidor rodando em http://localhost:${PORT}`);
   console.log(`📋 Dashboard: http://localhost:${PORT}`);
   console.log(`🔌 Webhook WhatsApp: http://localhost:${PORT}/webhook/whatsapp`);
   console.log(`📡 Health: http://localhost:${PORT}/health\n`);
+  await criarAdminInicial();
 });
 
 // Inicia scheduler de lembretes
