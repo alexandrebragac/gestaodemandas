@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Redefinir Senha — Gestão de Demandas</title>
+  <link rel="stylesheet" href="/css/style.css" />
+  <style>
+    body { display: flex; align-items: center; justify-content: center; min-height: 100vh; padding: 20px; box-sizing: border-box; }
+    .box { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 36px 32px; width: 100%; max-width: 400px; box-shadow: 0 8px 32px rgba(0,0,0,.4); }
+    .box-header { text-align: center; margin-bottom: 24px; }
+    .box-header h1 { font-size: 1.3rem; color: var(--text); margin: 0 0 5px; }
+    .box-header p  { font-size: .85rem; color: var(--text-muted); margin: 0; }
+    label { display: block; font-size: .75rem; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: .06em; margin: 14px 0 5px; }
+    input { width: 100%; padding: 11px 13px; background: var(--surface-3); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-size: .95rem; font-family: inherit; box-sizing: border-box; }
+    input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-glow); }
+    .btn-submit { width: 100%; padding: 13px; background: var(--accent); color: #fff; border: none; border-radius: 8px; font-size: 1rem; font-weight: 700; cursor: pointer; margin-top: 20px; font-family: inherit; transition: background .15s; }
+    .btn-submit:hover { background: var(--accent-hover); }
+    .btn-submit:disabled { opacity: .5; cursor: not-allowed; }
+    .form-msg { font-size: .85rem; text-align: center; margin-top: 12px; min-height: 20px; }
+    .form-msg.ok  { color: var(--success); }
+    .form-msg.err { color: var(--danger); }
+    .footer-link { margin-top: 18px; text-align: center; font-size: .82rem; color: var(--text-muted); }
+    .footer-link a { color: var(--accent); text-decoration: none; }
+    .success-box { display: none; text-align: center; padding: 10px 0; }
+    .success-box .icon { font-size: 2.5rem; margin-bottom: 12px; }
+    .success-box h2 { color: var(--success); margin-bottom: 8px; }
+    .success-box p { color: var(--text-muted); font-size: .9rem; }
+    .err-box { text-align: center; padding: 20px 0; }
+    .err-box .icon { font-size: 2.5rem; margin-bottom: 12px; }
+  </style>
+</head>
+<body>
+  <div class="box">
+    <div class="box-header">
+      <h1>🔑 Nova Senha</h1>
+      <p>Digite sua nova senha abaixo</p>
+    </div>
+
+    <div id="form-area" style="display:none">
+      <label for="nova-senha">Nova senha</label>
+      <input type="password" id="nova-senha" placeholder="Mínimo 6 caracteres" autocomplete="new-password" />
+
+      <label for="confirmar-senha">Confirmar senha</label>
+      <input type="password" id="confirmar-senha" placeholder="Repita a senha" autocomplete="new-password" />
+
+      <button class="btn-submit" id="btn-salvar">Salvar nova senha</button>
+      <div class="form-msg" id="form-msg"></div>
+    </div>
+
+    <div class="success-box" id="success-box">
+      <div class="icon">✅</div>
+      <h2>Senha Redefinida!</h2>
+      <p>Sua senha foi alterada com sucesso.</p>
+      <div class="footer-link" style="margin-top:20px">
+        <a href="/login.html">Ir para o login →</a>
+      </div>
+    </div>
+
+    <div id="err-box" style="display:none;text-align:center;padding:20px 0">
+      <div style="font-size:2.5rem;margin-bottom:12px">❌</div>
+      <h2 id="err-titulo" style="color:var(--danger);margin-bottom:8px">Link inválido</h2>
+      <p id="err-msg" style="color:var(--text-muted);font-size:.9rem"></p>
+      <div class="footer-link" style="margin-top:20px">
+        <a href="/recuperar-senha.html">Solicitar novo link</a>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const token = new URLSearchParams(window.location.search).get('token');
+
+    if (!token) {
+      document.getElementById('err-titulo').textContent = 'Link inválido';
+      document.getElementById('err-msg').textContent = 'Nenhum token encontrado na URL.';
+      document.getElementById('err-box').style.display = 'block';
+    } else {
+      document.getElementById('form-area').style.display = 'block';
+    }
+
+    const btn = document.getElementById('btn-salvar');
+    const msgEl = document.getElementById('form-msg');
+
+    btn.addEventListener('click', async () => {
+      const nova = document.getElementById('nova-senha').value;
+      const conf = document.getElementById('confirmar-senha').value;
+      msgEl.textContent = '';
+      msgEl.className = 'form-msg';
+
+      if (!nova || !conf) {
+        msgEl.textContent = '❌ Preencha os dois campos.';
+        msgEl.className = 'form-msg err';
+        return;
+      }
+      if (nova.length < 6) {
+        msgEl.textContent = '❌ A senha deve ter pelo menos 6 caracteres.';
+        msgEl.className = 'form-msg err';
+        return;
+      }
+      if (nova !== conf) {
+        msgEl.textContent = '❌ As senhas não coincidem.';
+        msgEl.className = 'form-msg err';
+        return;
+      }
+
+      btn.disabled = true;
+      btn.textContent = '⏳ Salvando...';
+      try {
+        const res = await fetch('/api/auth/redefinir-senha', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ token, nova_senha: nova }),
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          document.getElementById('form-area').style.display = 'none';
+          document.getElementById('err-titulo').textContent = 'Erro';
+          document.getElementById('err-msg').textContent = data.erro || 'Não foi possível redefinir a senha.';
+          document.getElementById('err-box').style.display = 'block';
+          return;
+        }
+        document.getElementById('form-area').style.display = 'none';
+        document.getElementById('success-box').style.display = 'block';
+      } catch (e) {
+        msgEl.textContent = '❌ Erro de conexão.';
+        msgEl.className = 'form-msg err';
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Salvar nova senha';
+      }
+    });
+  </script>
+</body>
+</html>

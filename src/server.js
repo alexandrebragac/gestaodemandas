@@ -63,6 +63,17 @@ try { db.prepare("ALTER TABLE usuarios ADD COLUMN canal TEXT NOT NULL DEFAULT 'w
 try { db.prepare("ALTER TABLE usuarios ADD COLUMN senha_hash TEXT").run(); console.log('[Migration] Adicionada coluna senha_hash'); } catch (_) {}
 try { db.prepare("ALTER TABLE usuarios ADD COLUMN perfil TEXT NOT NULL DEFAULT 'usuario'").run(); console.log('[Migration] Adicionada coluna perfil'); } catch (_) {}
 
+// Tabela de tokens de recuperação de senha
+db.exec(`
+  CREATE TABLE IF NOT EXISTS tokens_recuperacao (
+    token TEXT PRIMARY KEY,
+    usuario_id TEXT NOT NULL REFERENCES usuarios(id),
+    expira_em TEXT NOT NULL,
+    usado INTEGER NOT NULL DEFAULT 0,
+    criado_em TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+`);
+
 // Tabela de solicitações de cadastro
 db.exec(`
   CREATE TABLE IF NOT EXISTS solicitacoes_cadastro (

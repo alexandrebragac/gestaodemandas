@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Recuperar Senha — Gestão de Demandas</title>
+  <link rel="stylesheet" href="/css/style.css" />
+  <style>
+    body { display: flex; align-items: center; justify-content: center; min-height: 100vh; padding: 20px; box-sizing: border-box; }
+    .box { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 36px 32px; width: 100%; max-width: 400px; box-shadow: 0 8px 32px rgba(0,0,0,.4); }
+    .box-header { text-align: center; margin-bottom: 24px; }
+    .box-header h1 { font-size: 1.3rem; color: var(--text); margin: 0 0 5px; }
+    .box-header p  { font-size: .85rem; color: var(--text-muted); margin: 0; }
+    label { display: block; font-size: .75rem; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: .06em; margin: 14px 0 5px; }
+    input { width: 100%; padding: 11px 13px; background: var(--surface-3); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-size: .95rem; font-family: inherit; box-sizing: border-box; }
+    input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-glow); }
+    .btn-submit { width: 100%; padding: 13px; background: var(--accent); color: #fff; border: none; border-radius: 8px; font-size: 1rem; font-weight: 700; cursor: pointer; margin-top: 20px; font-family: inherit; transition: background .15s; }
+    .btn-submit:hover { background: var(--accent-hover); }
+    .btn-submit:disabled { opacity: .5; cursor: not-allowed; }
+    .form-msg { font-size: .85rem; text-align: center; margin-top: 12px; min-height: 20px; }
+    .form-msg.ok  { color: var(--success); }
+    .form-msg.err { color: var(--danger); }
+    .footer-link { margin-top: 18px; text-align: center; font-size: .82rem; color: var(--text-muted); }
+    .footer-link a { color: var(--accent); text-decoration: none; }
+    .success-box { display: none; text-align: center; padding: 10px 0; }
+    .success-box .icon { font-size: 2.5rem; margin-bottom: 12px; }
+    .success-box h2 { color: var(--success); margin-bottom: 8px; }
+    .success-box p { color: var(--text-muted); font-size: .9rem; line-height: 1.5; }
+  </style>
+</head>
+<body>
+  <div class="box">
+    <div class="box-header">
+      <h1>🔑 Recuperar Senha</h1>
+      <p>Informe seu email para receber o link de redefinição</p>
+    </div>
+
+    <div id="form-area">
+      <label for="email">Email cadastrado</label>
+      <input type="email" id="email" placeholder="seu@email.com" autocomplete="email" />
+
+      <button class="btn-submit" id="btn-enviar">Enviar instruções</button>
+      <div class="form-msg" id="form-msg"></div>
+
+      <div class="footer-link">
+        <a href="/login.html">← Voltar para o login</a>
+      </div>
+    </div>
+
+    <div class="success-box" id="success-box">
+      <div class="icon">📬</div>
+      <h2>Instruções Enviadas!</h2>
+      <p>Se o email estiver cadastrado, você receberá o link de redefinição via <strong>email ou WhatsApp</strong> em instantes.</p>
+      <div class="footer-link" style="margin-top:20px">
+        <a href="/login.html">← Voltar para o login</a>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const btn = document.getElementById('btn-enviar');
+    const msgEl = document.getElementById('form-msg');
+
+    btn.addEventListener('click', async () => {
+      const email = document.getElementById('email').value.trim();
+      msgEl.textContent = '';
+      msgEl.className = 'form-msg';
+
+      if (!email) {
+        msgEl.textContent = '❌ Informe seu email.';
+        msgEl.className = 'form-msg err';
+        return;
+      }
+
+      btn.disabled = true;
+      btn.textContent = '⏳ Enviando...';
+      try {
+        const res = await fetch('/api/auth/recuperar-senha', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email }),
+        });
+        // Sempre mostra sucesso (backend não revela se email existe)
+        document.getElementById('form-area').style.display = 'none';
+        document.getElementById('success-box').style.display = 'block';
+      } catch (e) {
+        msgEl.textContent = '❌ Erro de conexão. Verifique o servidor.';
+        msgEl.className = 'form-msg err';
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Enviar instruções';
+      }
+    });
+
+    document.getElementById('email').addEventListener('keydown', e => {
+      if (e.key === 'Enter') btn.click();
+    });
+  </script>
+</body>
+</html>

@@ -9,6 +9,7 @@
 const express = require('express');
 const bcrypt  = require('bcryptjs');
 const jwt     = require('jsonwebtoken');
+const crypto  = require('crypto');
 const getDb   = require('../database/db');
 
 const router = express.Router();
@@ -101,6 +102,73 @@ router.put('/alterar-senha', authMiddleware, async (req, res) => {
   const hash = await bcrypt.hash(nova_senha, 10);
   db.prepare('UPDATE usuarios SET senha_hash = ? WHERE id = ?').run(hash, req.auth.id);
   res.json({ ok: true });
+});
+
+// POST /api/auth/recuperar-senha — solicita link de redefinição
+router.post('/recuperar-senha', async (req, res) => {
+  const { email } = req.body;
+  if (!email) return res.status(400).json({ erro: 'email é obrigatório' });
+
+  const db = getDb();
+  const usuario = db.prepare('SELECT * FROM usuarios WHERE email = ?').get(email.trim().toLowerCase());
+
+  // Sempre retorna OK para não revelar se o email existe
+  if (!usuario) return res.json({ ok: true, mensagem: 'Se o email existir, você receberá as instruções.' });
+
+  // Invalida tokens anteriores do usuário
+  db.prepare('UPDATE tokens_recuperacao SET usado = 1 WHERE usuario_id = ?').run(usuario.id);
+
+  const token = crypto.randomBytes(32).toString('hex');
+  const expira = new Date(Date.now() + 60 * 60 * 1000).toISOString(); // 1 hora
+
+  db.prepare('INSERT INTO tokens_recuperacao (token, usuario_id, expira_em) VALUES (?, ?, ?)').run(token, usuario.id, expira);
+
+  const appUrl = process.env.APP_URL || 'http://localhost:3000';
+  const link = `${appUrl}/redefinir-senha.html?token=${token}`;
+  const msg = `🔑 *Redefinição de Senha*\n\nOlá ${usuario.nome}! Clique no link abaixo para redefinir sua senha:\n\n${link}\n\n_O link expira em 1 hora._`;
+
+  // Envia via email e/ou WhatsApp conforme canal
+  const canal = usuario.canal || 'whatsapp';
+  try {
+    if (canal === 'email' || canal === 'ambos') {
+      const emailService = require('../services/email');
+      const html = `<!DOCTYPE html><html><body style="font-family:Arial;background:#13131f;color:#e2e2ee;padding:20px">
+        <div style="background:#1e1e2e;border:1px solid #3a3a52;border-radius:12px;max-width:500px;margin:0 auto;padding:28px">
+          <h2 style="color:#7c5cfc">🔑 Redefinição de Senha</h2>
+          <p>Olá <strong>${usuario.nome}</strong>!</p>
+          <p>Clique no botão abaixo para redefinir sua senha. O link expira em <strong>1 hora</strong>.</p>
+          <a href="${link}" style="display:inline-block;padding:12px 24px;background:#7c5cfc;color:#fff;border-radius:8px;text-decoration:none;font-weight:700;margin:16px 0">Redefinir Senha</a>
+          <p style="font-size:.8rem;color:#888">Se você não solicitou isso, ignore este email.</p>
+        </div>
+      </body></html>`;
+      await emailService.enviarEmail(usuario, '🔑 Redefinição de Senha — Gestão de Demandas', html);
+    }
+    if (canal === 'whatsapp' || canal === 'ambos') {
+      const whatsappService = require('../services/whatsapp');
+      await whatsappService.enviarMensagem(usuario, msg).catch(() => {});
+    }
+  } catch (_) {}
+
+  res.json({ ok: true, mensagem: 'Se o email existir, você receberá as instruções.' });
+});
+
+// POST /api/auth/redefinir-senha — redefine senha com token
+router.post('/redefinir-senha', async (req, res) => {
+  const { token, nova_senha } = req.body;
+  if (!token || !nova_senha) return res.status(400).json({ erro: 'token e nova_senha são obrigatórios' });
+  if (nova_senha.length < 6) return res.status(400).json({ erro: 'Senha deve ter pelo menos 6 caracteres' });
+
+  const db = getDb();
+  const registro = db.prepare('SELECT * FROM tokens_recuperacao WHERE token = ?').get(token);
+
+  if (!registro || registro.usado) return res.status(400).json({ erro: 'Link inválido ou já utilizado.' });
+  if (new Date(registro.expira_em) < new Date()) return res.status(400).json({ erro: 'Link expirado. Solicite um novo.' });
+
+  const hash = await bcrypt.hash(nova_senha, 10);
+  db.prepare('UPDATE usuarios SET senha_hash = ? WHERE id = ?').run(hash, registro.usuario_id);
+  db.prepare('UPDATE tokens_recuperacao SET usado = 1 WHERE token = ?').run(token);
+
+  res.json({ ok: true, mensagem: 'Senha redefinida com sucesso!' });
 });
 
 // PUT /api/auth/perfil/:id — admin altera perfil de usuário
