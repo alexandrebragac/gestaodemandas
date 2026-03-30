@@ -568,7 +568,27 @@ async function executarAcao(id, tipo) {
 }
 
 async function excluirDemanda(id, descricao, btn) {
-  if (!confirm(`Excluir a demanda:\n"${descricao}"?\n\nEsta ação não pode ser desfeita.`)) return;
+  // Confirmação inline no modal (evita bloqueio do confirm() pelo browser)
+  const confirmado = await new Promise(resolve => {
+    const overlay = document.createElement('div');
+    overlay.style.cssText = 'position:absolute;inset:0;background:rgba(0,0,0,.7);border-radius:12px;display:flex;align-items:center;justify-content:center;z-index:10;backdrop-filter:blur(2px)';
+    overlay.innerHTML = `
+      <div style="background:#1a1a1a;border:1px solid #333;border-radius:10px;padding:24px;max-width:320px;text-align:center">
+        <div style="font-size:1.4rem;margin-bottom:10px">🗑️</div>
+        <div style="font-size:.9rem;font-weight:600;margin-bottom:6px">Excluir atividade?</div>
+        <div style="font-size:.8rem;color:#737373;margin-bottom:20px">"${descricao.slice(0,60)}${descricao.length>60?'…':''}"</div>
+        <div style="display:flex;gap:8px;justify-content:center">
+          <button id="conf-cancelar" style="padding:7px 18px;background:transparent;border:1px solid #333;border-radius:6px;color:#737373;cursor:pointer;font-size:.85rem;font-family:inherit">Cancelar</button>
+          <button id="conf-confirmar" style="padding:7px 18px;background:rgba(239,68,68,.15);border:1px solid rgba(239,68,68,.3);border-radius:6px;color:#ef4444;cursor:pointer;font-size:.85rem;font-weight:600;font-family:inherit">Excluir</button>
+        </div>
+      </div>`;
+    const modalContent = document.querySelector('.modal-content');
+    modalContent.style.position = 'relative';
+    modalContent.appendChild(overlay);
+    overlay.querySelector('#conf-confirmar').onclick = () => { overlay.remove(); resolve(true); };
+    overlay.querySelector('#conf-cancelar').onclick  = () => { overlay.remove(); resolve(false); };
+  });
+  if (!confirmado) return;
   try {
     const qs = currentUser ? `?usuario_id=${currentUser.id}` : '';
     await api(`/api/demandas/${id}${qs}`, { method: 'DELETE' });
