@@ -223,8 +223,18 @@ async function enviarRelatorioEmail(usuario, { vencidas, vencem_hoje, vencem_em_
   await enviarEmail(usuario, `📊 Relatório Diário — ${hoje}`, html);
 }
 
+async function notificarExclusao(destinatario, autor, demanda) {
+  const html = layout('🗑️ Atividade Cancelada', `
+    ${campo('Atividade', demanda.descricao)}
+    ${campo('Cancelada por', autor.nome)}
+    <p style="color:#8888aa;font-size:.85rem;margin-top:12px">Esta atividade foi removida do sistema.</p>
+  `);
+  await enviarEmail(destinatario, `🗑️ Atividade cancelada: ${demanda.descricao.slice(0, 50)}`, html);
+}
+
 module.exports = {
   enviarEmail,
+  notificarExclusao,
   notificarNovaDemanda,
   notificarAceite,
   notificarConclusao,

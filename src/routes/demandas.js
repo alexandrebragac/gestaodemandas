@@ -276,6 +276,10 @@ router.delete('/:id', (req, res) => {
     return res.status(400).json({ erro: 'Demandas finalizadas não podem ser excluídas.' });
   }
 
+  const solicitante = db.prepare('SELECT * FROM usuarios WHERE id = ?').get(demanda.solicitante_id);
+  const responsavel  = db.prepare('SELECT * FROM usuarios WHERE id = ?').get(demanda.responsavel_id);
+  const autor        = usuario_id ? db.prepare('SELECT * FROM usuarios WHERE id = ?').get(usuario_id) : solicitante;
+
   const excluir = db.transaction(() => {
     db.prepare('DELETE FROM lembretes WHERE demanda_id = ?').run(demanda.id);
     db.prepare('DELETE FROM mensagens WHERE demanda_id = ?').run(demanda.id);
@@ -283,6 +287,10 @@ router.delete('/:id', (req, res) => {
   });
 
   excluir();
+
+  // Notifica os envolvidos (sem aguardar para não atrasar a resposta)
+  notificacoes.exclusao(responsavel, solicitante, autor || solicitante, demanda).catch(() => {});
+
   res.status(204).end();
 });
 

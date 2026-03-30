@@ -94,4 +94,19 @@ async function solicitarAtualizacao(responsavel, solicitante, demanda) {
   );
 }
 
-module.exports = { novaDemanda, aceite, conclusao, baixa, novoPrazo, lembrete, solicitarAtualizacao };
+// Notifica ambos quando uma demanda é excluída
+async function exclusao(responsavel, solicitante, autor, demanda) {
+  const notificar = async (dest) => {
+    await dispatch(
+      dest,
+      () => whatsappService.notificarExclusao(dest, autor, demanda),
+      () => emailService.notificarExclusao ? emailService.notificarExclusao(dest, autor, demanda) : Promise.resolve()
+    );
+  };
+  // Notifica responsável (se diferente do autor)
+  if (responsavel.id !== autor.id) await notificar(responsavel);
+  // Notifica solicitante (se diferente do autor e diferente do responsável)
+  if (solicitante.id !== autor.id && solicitante.id !== responsavel.id) await notificar(solicitante);
+}
+
+module.exports = { novaDemanda, aceite, conclusao, baixa, novoPrazo, lembrete, solicitarAtualizacao, exclusao };
