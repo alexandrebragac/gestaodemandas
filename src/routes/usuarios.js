@@ -1,6 +1,7 @@
 const express = require('express');
 const { v4: uuidv4 } = require('uuid');
 const getDb = require('../database/db');
+const { authMiddleware, adminOnly } = require('./auth');
 
 const router = express.Router();
 
@@ -55,6 +56,20 @@ router.put('/:id', (req, res) => {
   } catch (err) {
     if (err.message.includes('UNIQUE')) return res.status(409).json({ erro: 'Telefone ou email já cadastrado' });
     throw err;
+  }
+});
+
+// POST /usuarios/:id/boas-vindas — admin: reenvia link de ativação do WhatsApp
+router.post('/:id/boas-vindas', authMiddleware, adminOnly, async (req, res) => {
+  const db = getDb();
+  const usuario = db.prepare('SELECT * FROM usuarios WHERE id = ?').get(req.params.id);
+  if (!usuario) return res.status(404).json({ erro: 'Usuário não encontrado' });
+  try {
+    const notificacoes = require('../services/notificacoes');
+    const resultado = await notificacoes.boasVindas(usuario);
+    res.json({ ok: true, resultado });
+  } catch (err) {
+    res.status(500).json({ erro: err.message });
   }
 });
 

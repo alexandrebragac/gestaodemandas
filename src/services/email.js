@@ -252,8 +252,24 @@ async function notificarExclusao(destinatario, autor, demanda) {
   await enviarEmail(destinatario, `🗑️ Atividade cancelada: ${demanda.descricao.slice(0, 50)}`, html);
 }
 
+async function enviarBoasVindas(usuario) {
+  const link = 'https://wa.me/14155238886?text=gather-meant';
+  const html = layout('👋 Bem-vindo ao Gestão de Demandas', `
+    <p style="margin:0 0 12px;color:#c0c0d0">Olá, <strong>${usuario.nome}</strong>! Seu cadastro está ativo.</p>
+    <p style="margin:0 0 16px;font-size:.9rem;color:#8888aa">Para ativar o recebimento de notificações pelo WhatsApp, clique no botão abaixo e envie a mensagem que aparecerá preenchida:</p>
+    <a href="${link}" class="btn btn-green">📲 Ativar WhatsApp</a>
+    <div style="margin-top:18px;padding:14px;background:#13131f;border-radius:8px;font-size:.82rem;color:#8888aa">
+      <strong style="color:#e2e2ee;display:block;margin-bottom:6px">Ou copie o link:</strong>
+      <span style="word-break:break-all">${link}</span>
+    </div>
+    <p style="margin-top:16px;font-size:.82rem;color:#8888aa">Após enviar a mensagem, você começará a receber as notificações do sistema diretamente pelo WhatsApp.</p>
+  `);
+  await enviarEmail(usuario, '📲 Ative seu WhatsApp — Gestão de Demandas', html);
+}
+
 module.exports = {
   enviarEmail,
+  enviarBoasVindas,
   notificarExclusao,
   notificarNovaDemanda,
   notificarAceite,
