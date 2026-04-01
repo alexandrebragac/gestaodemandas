@@ -623,11 +623,13 @@ async function handleAceitar(usuario, telefone, res) {
   const db = getDb();
 
   // Busca todas as demandas aguardando aceite deste usuário
+  // pendente_aceite → somente o responsável aceita
   const comoResponsavel = db.prepare(`
-    SELECT * FROM demandas WHERE responsavel_id = ? AND status IN ('pendente_aceite','em_negociacao')
+    SELECT * FROM demandas WHERE responsavel_id = ? AND status = 'pendente_aceite'
     ORDER BY criado_em DESC
   `).all(usuario.id);
 
+  // em_negociacao → somente o solicitante aceita o novo prazo proposto
   const comoSolicitante = db.prepare(`
     SELECT * FROM demandas WHERE solicitante_id = ? AND status = 'em_negociacao'
     ORDER BY atualizado_em DESC
