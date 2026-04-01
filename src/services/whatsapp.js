@@ -185,6 +185,17 @@ async function enviarLembrete(destinatario, demanda, tipoLembrete) {
   await enviarMensagem(destinatario, msg, { comMenu: true });
 }
 
+async function enviarBoasVindas(usuario) {
+  const link = 'https://wa.me/14155238886?text=gather-meant';
+  const msg =
+    `👋 *Olá, ${primeiroNome(usuario.nome)}!*\n\n` +
+    `Seu cadastro no sistema de *Gestão de Demandas* está pronto.\n\n` +
+    `Para ativar o recebimento de mensagens aqui no WhatsApp, toque no link abaixo e envie a mensagem que aparecerá preenchida:\n\n` +
+    `📲 ${link}\n\n` +
+    `_Após enviar, você já começa a receber as notificações por aqui._`;
+  await enviarMensagem(usuario, msg);
+}
+
 async function enviarRelatorioDiario(usuario, { vencidas, vencem_hoje, vencem_em_3_dias, total_ativas }) {
   const hoje = formatarData(new Date().toISOString().slice(0, 10));
   let msg = `📊 *Relatório — ${hoje}*\nOlá, ${primeiroNome(usuario.nome)}!\n\n`;
@@ -212,6 +223,7 @@ module.exports = {
   notificarImpedimento,
   enviarLembrete,
   enviarRelatorioDiario,
+  enviarBoasVindas,
   linkWhatsApp,
   gerarMenuContextual,
 };

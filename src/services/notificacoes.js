@@ -110,4 +110,28 @@ async function exclusao(responsavel, solicitante, autor, demanda) {
   if (solicitante.id !== autor.id && solicitante.id !== responsavel.id) await notificar(solicitante);
 }
 
-module.exports = { novaDemanda, aceite, conclusao, baixa, novoPrazo, lembrete, solicitarAtualizacao, exclusao };
+// Envia boas-vindas com link de ativação do WhatsApp — sempre tenta os dois canais
+async function boasVindas(usuario) {
+  const resultados = {};
+  if (usuario.telefone_whatsapp) {
+    try {
+      await whatsappService.enviarBoasVindas(usuario);
+      resultados.whatsapp = { ok: true };
+    } catch (e) {
+      resultados.whatsapp = { ok: false, erro: e.message };
+      console.error('[Notificações] Boas-vindas WhatsApp:', e.message);
+    }
+  }
+  if (usuario.email) {
+    try {
+      await emailService.enviarBoasVindas(usuario);
+      resultados.email = { ok: true };
+    } catch (e) {
+      resultados.email = { ok: false, erro: e.message };
+      console.error('[Notificações] Boas-vindas Email:', e.message);
+    }
+  }
+  return resultados;
+}
+
+module.exports = { novaDemanda, aceite, conclusao, baixa, novoPrazo, lembrete, solicitarAtualizacao, exclusao, boasVindas };

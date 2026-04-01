@@ -227,6 +227,7 @@
           <td>
             <div class="action-btns">
               <button class="btn-sm" onclick="abrirEdicao('${u.id}')">✏️ Editar</button>
+              <button class="btn-sm" onclick="enviarRecadastro('${u.id}','${u.nome}')" title="Reenviar link de ativação do WhatsApp">📲 Recadastro</button>
               <button class="btn-sm danger" onclick="excluirUsuario('${u.id}','${u.nome}')">🗑️</button>
             </div>
           </td>
@@ -316,6 +317,14 @@
         await carregarUsuarios();
       } catch(e) { showMsg('msg-editar','❌ '+e.message,'err'); }
     });
+
+    async function enviarRecadastro(id, nome) {
+      if (!confirm(`Reenviar link de ativação do WhatsApp para "${nome}"?`)) return;
+      try {
+        await api(`/api/usuarios/${id}/boas-vindas`, { method:'POST', body:{} });
+        alert(`✅ Link de ativação enviado para ${nome}!`);
+      } catch(e) { alert('Erro: ' + e.message); }
+    }
 
     async function excluirUsuario(id, nome) {
       if (!confirm(`Excluir "${nome}"?`)) return;

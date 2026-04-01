@@ -136,10 +136,13 @@ router.post('/aprovar/:id', authMiddleware, adminOnly, async (req, res) => {
   try {
     const usuario = db.prepare('SELECT * FROM usuarios WHERE id = ?').get(usuarioId);
     const whatsappService = require('../services/whatsapp');
+    const notificacoes = require('../services/notificacoes');
     const msg = `✅ *Cadastro Aprovado!*\n\nOlá ${sol.nome}! Seu cadastro no sistema de Gestão de Demandas foi aprovado.\n\nAcesse: ${process.env.APP_URL || 'http://localhost:3000'}/login.html\n\nEmail: ${sol.email}\nSenha provisória: ${senhaProvisoria}\n\n_Recomendamos alterar sua senha após o primeiro acesso._`;
     if (sol.canal === 'whatsapp' || sol.canal === 'ambos') {
       await whatsappService.enviarMensagem(usuario, msg).catch(() => {});
     }
+    // Envia link de ativação do WhatsApp (boas-vindas)
+    await notificacoes.boasVindas(usuario).catch(() => {});
   } catch (_) {}
 
   res.json({ ok: true, usuario_id: usuarioId, senha_provisoria: senhaProvisoria });
