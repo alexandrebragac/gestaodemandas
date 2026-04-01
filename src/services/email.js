@@ -253,7 +253,7 @@ async function notificarExclusao(destinatario, autor, demanda) {
 }
 
 async function enviarBoasVindas(usuario) {
-  const link = 'https://wa.me/14155238886?text=gather-meant';
+  const link = 'https://wa.me/14155238886?text=join%20gather-meant';
   const html = layout('👋 Bem-vindo ao Gestão de Demandas', `
     <p style="margin:0 0 12px;color:#c0c0d0">Olá, <strong>${usuario.nome}</strong>! Seu cadastro está ativo.</p>
     <p style="margin:0 0 16px;font-size:.9rem;color:#8888aa">Para ativar o recebimento de notificações pelo WhatsApp, clique no botão abaixo e envie a mensagem que aparecerá preenchida:</p>
