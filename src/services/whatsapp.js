@@ -186,7 +186,7 @@ async function enviarLembrete(destinatario, demanda, tipoLembrete) {
 }
 
 async function enviarBoasVindas(usuario) {
-  const link = 'https://wa.me/14155238886?text=gather-meant';
+  const link = 'https://wa.me/14155238886?text=join%20gather-meant';
   const msg =
     `👋 *Olá, ${primeiroNome(usuario.nome)}!*\n\n` +
     `Seu cadastro no sistema de *Gestão de Demandas* está pronto.\n\n` +
