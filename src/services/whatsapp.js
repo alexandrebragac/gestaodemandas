@@ -59,22 +59,26 @@ function gerarMenuContextual(usuario) {
 
     const asResp = d => d.responsavel_id === usuario.id;
     const asSol  = d => d.solicitante_id === usuario.id;
-    const pendenteAceite = demandas.filter(d => asResp(d) && d.status === 'pendente_aceite').length;
+    // pendente_aceite: responsavel aceita; em_negociacao: solicitante aceita novo prazo
+    const paraAceitar = demandas.filter(d =>
+      (asResp(d) && d.status === 'pendente_aceite') ||
+      (asSol(d)  && d.status === 'em_negociacao')
+    ).length;
     const emAtividade    = demandas.filter(d => asResp(d) && ['aceita', 'em_andamento'].includes(d.status)).length;
     const aguardaBaixa   = demandas.filter(d => asSol(d)  && d.status === 'concluida_aguardando_baixa').length;
 
     const linhas = [];
-    if (pendenteAceite > 0) linhas.push(`✅ *1* — Aceitar atividade _(${pendenteAceite})_`);
+    if (paraAceitar > 0) linhas.push(`✅ *1* — Aceitar atividade _(${paraAceitar})_`);
     if (aguardaBaixa > 0)   linhas.push(`🎉 *2* — Confirmar conclusão _(${aguardaBaixa})_`);
     if (emAtividade > 0)    linhas.push(`✔️ *3* — Concluir atividade`);
-    linhas.push(`📋 *4* — Ver minhas atividades`);
-    linhas.push(`➕ *5* — Criar nova atividade`);
+    linhas.push(`📋 *6* — Ver minhas atividades`);
+    linhas.push(`➕ *7* — Criar nova atividade`);
 
     const menu = `\n─────────────────\n${linhas.join('\n')}`;
     _menuCache.set(usuario.id, { menu, ts: Date.now() });
     return menu;
   } catch (e) {
-    return `\n─────────────────\n📋 *4* — Ver atividades\n➕ *5* — Criar atividade`;
+    return `\n─────────────────\n📋 *6* — Ver atividades\n➕ *7* — Criar atividade`;
   }
 }
 
@@ -153,8 +157,8 @@ async function notificarNovoPrazo(solicitante, responsavel, demanda, justificati
     `📅 *${primeiroNome(responsavel.nome)} propôs novo prazo*\n\n` +
     `"${demanda.descricao}"\n` +
     `Novo prazo: *${formatarData(demanda.nova_data)}*${motivo}\n\n` +
-    `Acesse o sistema para aceitar ou negociar.`;
-  await enviarMensagem(solicitante, msg);
+    `Responda *1* para aceitar ou acesse o sistema para negociar.`;
+  await enviarMensagem(solicitante, msg, { comMenu: true });
 }
 
 async function notificarImpedimento(solicitante, responsavel, demanda, descricao) {
