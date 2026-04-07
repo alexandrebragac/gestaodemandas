@@ -88,6 +88,36 @@ db.exec(`
   );
 `);
 
+// Tabelas do módulo de comparação de preços de supermercado
+db.exec(`
+  CREATE TABLE IF NOT EXISTS listas_mercado (
+    id TEXT PRIMARY KEY,
+    nome TEXT NOT NULL,
+    descricao TEXT,
+    status TEXT NOT NULL DEFAULT 'ativa' CHECK(status IN ('ativa','arquivada')),
+    criado_em TEXT NOT NULL DEFAULT (datetime('now')),
+    atualizado_em TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+  CREATE TABLE IF NOT EXISTS itens_lista_mercado (
+    id TEXT PRIMARY KEY,
+    lista_id TEXT NOT NULL REFERENCES listas_mercado(id) ON DELETE CASCADE,
+    nome TEXT NOT NULL,
+    quantidade REAL NOT NULL DEFAULT 1,
+    unidade TEXT NOT NULL DEFAULT 'un',
+    observacao TEXT,
+    criado_em TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+  CREATE TABLE IF NOT EXISTS comparacoes_mercado (
+    id TEXT PRIMARY KEY,
+    lista_id TEXT NOT NULL REFERENCES listas_mercado(id) ON DELETE CASCADE,
+    cep TEXT,
+    lat REAL,
+    lon REAL,
+    resultado_json TEXT NOT NULL,
+    criado_em TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+`);
+
 // Tabela de solicitações de cadastro
 db.exec(`
   CREATE TABLE IF NOT EXISTS solicitacoes_cadastro (
@@ -148,6 +178,7 @@ app.use('/api/auth', require('./routes/auth'));
 app.use('/api/email-acao', require('./routes/emailAcao'));
 app.use('/api/cadastro', require('./routes/cadastro'));
 app.use('/webhook', require('./routes/webhook'));
+app.use('/api/mercado', require('./routes/mercado'));
 
 // Health check
 app.get('/health', (req, res) => res.json({ ok: true, ts: new Date().toISOString() }));
