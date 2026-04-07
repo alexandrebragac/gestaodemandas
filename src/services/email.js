@@ -216,30 +216,64 @@ async function notificarSolicitacaoAtualizacao(responsavel, solicitante, demanda
 }
 
 async function enviarRelatorioEmail(usuario, { vencidas, vencem_hoje, vencem_em_3_dias, total_ativas }) {
-  function listaHtml(lista) {
-    if (!lista.length) return '<p style="color:#8888aa;font-size:.85rem">Nenhuma.</p>';
-    return `<ul style="margin:6px 0 0 16px;padding:0">${lista.map(d => `<li style="margin-bottom:4px;font-size:.88rem">${d.descricao} — ${formatarData(d.data_acordada || d.data_entrega)}</li>`).join('')}</ul>`;
+  const hoje = new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' });
+
+  function secao(cor, label, lista) {
+    const vazia = !lista.length;
+    const itens = vazia
+      ? `<p style="margin:0;color:#999;font-size:.83rem;font-style:italic">Nenhuma atividade</p>`
+      : lista.map(d => `
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #f0f0f0">
+            <span style="font-size:.88rem;color:#222;flex:1;padding-right:12px">${d.descricao}</span>
+            <span style="font-size:.78rem;color:#888;white-space:nowrap;font-weight:600">${formatarData(d.data_acordada || d.data_entrega)}</span>
+          </div>`).join('');
+    return `
+      <div style="margin-bottom:20px;background:#fff;border-radius:10px;overflow:hidden;border:1px solid #e8e8e8">
+        <div style="padding:10px 16px;background:${cor}12;border-left:4px solid ${cor};display:flex;align-items:center;gap:8px">
+          <span style="font-size:.78rem;font-weight:700;color:${cor};text-transform:uppercase;letter-spacing:.06em">${label}</span>
+          <span style="margin-left:auto;background:${cor};color:#fff;border-radius:20px;font-size:.72rem;font-weight:700;padding:1px 8px">${lista.length}</span>
+        </div>
+        <div style="padding:${vazia ? '12px 16px' : '0 16px'}">${itens}</div>
+      </div>`;
   }
 
-  const hoje = new Date().toLocaleDateString('pt-BR');
-  const html = layout(`📊 Relatório Diário — ${hoje}`, `
-    ${campo('Total de atividades ativas', total_ativas)}
-    <div style="margin-top:14px">
-      <div style="color:#ff5b5b;font-weight:600;font-size:.85rem;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">🔴 Vencidas</div>
-      ${listaHtml(vencidas)}
+  const html = `<!DOCTYPE html>
+<html lang="pt-BR">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#f4f4f8;font-family:Inter,Arial,sans-serif">
+  <div style="max-width:520px;margin:32px auto;padding:0 16px">
+
+    <!-- Header -->
+    <div style="text-align:center;margin-bottom:20px">
+      <div style="font-size:.7rem;font-weight:700;color:#999;text-transform:uppercase;letter-spacing:.1em;margin-bottom:6px">Gestão de Demandas</div>
+      <h1 style="margin:0;font-size:1.25rem;font-weight:700;color:#1a1a2e">Relatório Diário</h1>
+      <div style="font-size:.88rem;color:#888;margin-top:4px">${hoje}</div>
     </div>
-    <div style="margin-top:12px">
-      <div style="color:#ffcb00;font-weight:600;font-size:.85rem;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">🟡 Vencem Hoje</div>
-      ${listaHtml(vencem_hoje)}
+
+    <!-- Resumo -->
+    <div style="background:#fff;border-radius:12px;border:1px solid #e8e8e8;padding:16px 20px;margin-bottom:20px;display:flex;align-items:center;gap:8px">
+      <div style="font-size:.88rem;color:#555">Total de atividades ativas:</div>
+      <div style="font-size:1.1rem;font-weight:700;color:#1a1a2e;margin-left:auto">${total_ativas}</div>
     </div>
-    <div style="margin-top:12px">
-      <div style="color:#4d9eff;font-weight:600;font-size:.85rem;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">🔵 Vencem em até 3 dias</div>
-      ${listaHtml(vencem_em_3_dias)}
+
+    <!-- Seções -->
+    ${secao('#e53e3e', '🔴 Vencidas', vencidas)}
+    ${secao('#d69e2e', '🟡 Vencem hoje', vencem_hoje)}
+    ${secao('#3182ce', '🔵 Vencem em até 3 dias', vencem_em_3_dias)}
+
+    <!-- CTA -->
+    <div style="text-align:center;margin:24px 0 8px">
+      <a href="${appBaseUrl()}" style="display:inline-block;padding:12px 32px;background:#7c5cfc;color:#fff;text-decoration:none;border-radius:8px;font-weight:700;font-size:.95rem">Ver todas no sistema →</a>
     </div>
-    <div style="margin-top:18px">
-      <a href="${appBaseUrl()}" class="btn btn-purple">Ver todas no sistema</a>
+
+    <!-- Footer -->
+    <div style="text-align:center;margin-top:20px;font-size:.75rem;color:#bbb;padding-bottom:32px">
+      Mensagem automática · <a href="${appBaseUrl()}" style="color:#7c5cfc;text-decoration:none">Gestão de Demandas</a>
     </div>
-  `);
+
+  </div>
+</body></html>`;
+
   await enviarEmail(usuario, `📊 Relatório Diário — ${hoje}`, html);
 }
 
