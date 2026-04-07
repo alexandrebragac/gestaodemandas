@@ -131,7 +131,7 @@ async function continuarFluxo(usuario, texto, comando, parametros, sessao, telef
     case 'editar_campo':          await fluxoEditarCampo(usuario, texto, comando, parametros, sessao, telefone, res); break;
     case 'editar_nova_descricao': await fluxoEditarNovaDescricao(usuario, texto, sessao, telefone, res); break;
     case 'editar_novo_prazo':     await fluxoEditarNovoPrazo(usuario, texto, comando, parametros, sessao, telefone, res); break;
-    case 'aguardando_calendario':         await fluxoCalendario(usuario, texto, sessao, telefone, res); break;
+
     case 'aguardando_justificativa_prazo': await fluxoJustificativaPrazo(usuario, texto, sessao, telefone, res); break;
     case 'impedimento_selecionar':        await fluxoImpedimentoSelecionar(usuario, texto, comando, parametros, sessao, telefone, res); break;
     case 'aguardando_impedimento':        await fluxoImpedimento(usuario, texto, sessao, telefone, res); break;
@@ -688,34 +688,15 @@ async function executarAceite(usuario, demanda, telefone, res, db) {
     console.error('[Aceitar] Erro ao notificar outra parte:', err.message);
   }
 
-  // Pergunta sobre Google Calendar
-  setSessao(telefone, {
-    fluxo: 'aguardando_calendario',
-    descricao: demanda.descricao,
-    data: dataAcordada,
-    horario_entrega: demanda.horario_entrega || null,
-  });
+  const linkCal = dataAcordada ? gerarLinkCalendario(demanda.descricao, dataAcordada, demanda.horario_entrega || null) : null;
+  const calMsg = linkCal ? `\n\n📅 _Google Agenda:_ ${linkCal}` : '';
 
   await whatsappService.enviarMensagem(usuario,
-    `✅ *Aceito!*\n"${demanda.descricao}"\nPrazo: ${formatarData(dataAcordada)}\n\n` +
-    `📅 Deseja adicionar ao *Google Agenda*?\n\n*1* — Sim, enviar link\n*2* — Não`
+    `✅ *Aceito!*\n"${demanda.descricao}"\nPrazo: ${formatarData(dataAcordada)}${calMsg}`
   );
   res.status(200).send('OK');
 }
 
-async function fluxoCalendario(usuario, texto, sessao, telefone, res) {
-  clearSessao(telefone);
-
-  if (texto === '1') {
-    const link = gerarLinkCalendario(sessao.descricao, sessao.data, sessao.horario_entrega);
-    await whatsappService.enviarMensagem(usuario,
-      `📅 *Adicionar ao Google Agenda:*\n\n${link}\n\n_Clique no link para abrir e salvar o evento._`
-    );
-  } else {
-    await whatsappService.enviarMensagem(usuario, `👍 Ok!`);
-  }
-  res.status(200).send('OK');
-}
 
 async function handleNovoPrazoComData(usuario, demandaId, novaData, telefone, res) {
   const db = getDb();
