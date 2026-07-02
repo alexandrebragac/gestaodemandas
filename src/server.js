@@ -118,6 +118,108 @@ db.exec(`
   );
 `);
 
+// Tabelas do módulo de Atividades (rotina diária)
+db.exec(`
+  CREATE TABLE IF NOT EXISTS atividades (
+    id TEXT PRIMARY KEY,
+    titulo TEXT NOT NULL,
+    descricao TEXT,
+    area TEXT NOT NULL DEFAULT 'operacoes'
+      CHECK(area IN ('comercial','operacoes','financeiro','pessoas','performance','outro')),
+    tipo TEXT NOT NULL CHECK(tipo IN ('pontual','recorrente')),
+    formato TEXT NOT NULL DEFAULT 'simples' CHECK(formato IN ('simples','checklist')),
+    prioridade TEXT NOT NULL DEFAULT 'media' CHECK(prioridade IN ('baixa','media','alta','critica')),
+    criado_por TEXT NOT NULL REFERENCES usuarios(id),
+    responsavel_id TEXT NOT NULL REFERENCES usuarios(id),
+    recorrencia_tipo TEXT NOT NULL DEFAULT 'unica' CHECK(recorrencia_tipo IN ('unica','diaria','semanal','mensal')),
+    recorrencia_dias_semana TEXT,
+    recorrencia_dia_mes INTEGER CHECK(recorrencia_dia_mes IS NULL OR (recorrencia_dia_mes BETWEEN 1 AND 31)),
+    data_inicio TEXT NOT NULL,
+    data_fim TEXT,
+    horario_limite TEXT,
+    exige_aprovacao INTEGER NOT NULL DEFAULT 1,
+    exige_foto INTEGER NOT NULL DEFAULT 0,
+    permite_replanejamento INTEGER NOT NULL DEFAULT 1,
+    ativo INTEGER NOT NULL DEFAULT 1,
+    criado_em TEXT NOT NULL DEFAULT (datetime('now')),
+    atualizado_em TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+  CREATE TABLE IF NOT EXISTS atividade_checklist_itens (
+    id TEXT PRIMARY KEY,
+    atividade_id TEXT NOT NULL REFERENCES atividades(id) ON DELETE CASCADE,
+    descricao TEXT NOT NULL,
+    ordem INTEGER NOT NULL DEFAULT 0,
+    foto_obrigatoria INTEGER NOT NULL DEFAULT 0
+  );
+  CREATE TABLE IF NOT EXISTS atividade_campos (
+    id TEXT PRIMARY KEY,
+    atividade_id TEXT NOT NULL REFERENCES atividades(id) ON DELETE CASCADE,
+    rotulo TEXT NOT NULL,
+    tipo TEXT NOT NULL CHECK(tipo IN ('texto','numero','boolean','foto','selecao')),
+    obrigatorio INTEGER NOT NULL DEFAULT 0,
+    exige_foto INTEGER NOT NULL DEFAULT 0,
+    opcoes TEXT,
+    ordem INTEGER NOT NULL DEFAULT 0
+  );
+  CREATE TABLE IF NOT EXISTS atividade_ocorrencias (
+    id TEXT PRIMARY KEY,
+    atividade_id TEXT NOT NULL REFERENCES atividades(id) ON DELETE CASCADE,
+    responsavel_id TEXT NOT NULL REFERENCES usuarios(id),
+    data_referencia TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'pendente'
+      CHECK(status IN ('pendente','em_andamento','aguardando_validacao','concluida','atrasada','recusada')),
+    iniciada_em TEXT,
+    submetida_em TEXT,
+    concluida_em TEXT,
+    validada_por TEXT REFERENCES usuarios(id),
+    validada_em TEXT,
+    motivo_recusa TEXT,
+    justificativa_atraso TEXT,
+    comentario_execucao TEXT,
+    evidencia_url TEXT,
+    nova_data_prevista TEXT,
+    novo_horario_previsto TEXT,
+    criado_em TEXT NOT NULL DEFAULT (datetime('now')),
+    atualizado_em TEXT NOT NULL DEFAULT (datetime('now')),
+    UNIQUE(atividade_id, responsavel_id, data_referencia)
+  );
+  CREATE TABLE IF NOT EXISTS ocorrencia_checklist_itens (
+    id TEXT PRIMARY KEY,
+    ocorrencia_id TEXT NOT NULL REFERENCES atividade_ocorrencias(id) ON DELETE CASCADE,
+    item_id TEXT NOT NULL REFERENCES atividade_checklist_itens(id),
+    concluido INTEGER NOT NULL DEFAULT 0,
+    concluido_em TEXT,
+    evidencia_url TEXT,
+    comentario TEXT,
+    UNIQUE(ocorrencia_id, item_id)
+  );
+  CREATE TABLE IF NOT EXISTS ocorrencia_campo_valores (
+    id TEXT PRIMARY KEY,
+    ocorrencia_id TEXT NOT NULL REFERENCES atividade_ocorrencias(id) ON DELETE CASCADE,
+    campo_id TEXT NOT NULL REFERENCES atividade_campos(id),
+    valor TEXT,
+    evidencia_url TEXT,
+    UNIQUE(ocorrencia_id, campo_id)
+  );
+  CREATE TABLE IF NOT EXISTS ocorrencia_replanejamentos (
+    id TEXT PRIMARY KEY,
+    ocorrencia_id TEXT NOT NULL REFERENCES atividade_ocorrencias(id) ON DELETE CASCADE,
+    solicitante_id TEXT NOT NULL REFERENCES usuarios(id),
+    nova_data TEXT NOT NULL,
+    novo_horario TEXT,
+    motivo TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'pendente' CHECK(status IN ('pendente','aprovada','recusada')),
+    aprovador_id TEXT REFERENCES usuarios(id),
+    decidido_em TEXT,
+    motivo_recusa TEXT,
+    criado_em TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+  CREATE INDEX IF NOT EXISTS idx_ativ_ocorrencias_resp_data ON atividade_ocorrencias(responsavel_id, data_referencia);
+  CREATE INDEX IF NOT EXISTS idx_ativ_ocorrencias_status ON atividade_ocorrencias(status);
+  CREATE INDEX IF NOT EXISTS idx_ativ_atividades_resp ON atividades(responsavel_id, ativo);
+`);
+try { db.prepare("ALTER TABLE usuarios ADD COLUMN pode_criar_atividades INTEGER NOT NULL DEFAULT 0").run(); console.log('[Migration] Adicionada coluna pode_criar_atividades'); } catch (_) {}
+
 // Tabela de solicitações de cadastro
 db.exec(`
   CREATE TABLE IF NOT EXISTS solicitacoes_cadastro (
@@ -179,6 +281,7 @@ app.use('/api/email-acao', require('./routes/emailAcao'));
 app.use('/api/cadastro', require('./routes/cadastro'));
 app.use('/webhook', require('./routes/webhook'));
 app.use('/api/mercado', require('./routes/mercado'));
+app.use('/api/atividades', require('./routes/atividades'));
 
 // Health check
 app.get('/health', (req, res) => res.json({ ok: true, ts: new Date().toISOString() }));
@@ -223,3 +326,7 @@ app.listen(PORT, async () => {
 // Inicia scheduler de lembretes
 const { iniciarScheduler } = require('./services/scheduler');
 iniciarScheduler();
+
+// Inicia scheduler de atividades (geração diária de ocorrências + marcação de atraso)
+const { iniciarSchedulerAtividades } = require('./services/atividadesScheduler');
+iniciarSchedulerAtividades();

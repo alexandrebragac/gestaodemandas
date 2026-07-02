@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
+  <title>Minhas Atividades — Gestão de Demandas</title>
+  <link rel="stylesheet" href="/css/style.css" />
+  <style>
+    main { max-width: 760px; margin: 0 auto; padding: 16px 14px 100px; }
+
+    .score-card {
+      background: linear-gradient(135deg, var(--surface-2), var(--surface));
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 18px 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 18px;
+    }
+    .score-card .num { font-size: 2.2rem; font-weight: 800; letter-spacing: -.03em; }
+    .score-card .num.high { color: var(--success); }
+    .score-card .num.mid  { color: var(--warning); }
+    .score-card .num.low  { color: var(--danger); }
+    .score-card .label { font-size: .78rem; color: var(--text-muted); margin-top: 2px; }
+    .score-mini { display: flex; gap: 16px; font-size: .78rem; color: var(--text-muted); }
+    .score-mini b { color: var(--text); font-size: .95rem; display: block; }
+
+    .section-title { font-size: .82rem; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--text-muted); margin: 20px 0 10px; display: flex; align-items: center; gap: 8px; }
+    .section-title .count { background: var(--surface-3); padding: 2px 8px; border-radius: 10px; font-size: .72rem; }
+
+    .empty-msg { color: var(--text-muted); font-size: .9rem; padding: 32px 16px; text-align: center; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); }
+
+    .ativ-card { background: var(--surface); border: 1px solid var(--border); border-left: 4px solid var(--border); border-radius: var(--radius-lg); padding: 16px; margin-bottom: 12px; }
+    .ativ-card.status-atrasada { border-left-color: var(--danger); }
+    .ativ-card.status-pendente { border-left-color: var(--warning); }
+    .ativ-card.status-em_andamento { border-left-color: var(--accent); }
+    .ativ-card.status-aguardando_validacao { border-left-color: var(--purple); }
+    .ativ-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; margin-bottom: 8px; }
+    .ativ-titulo { font-size: 1.02rem; font-weight: 700; line-height: 1.35; }
+    .ativ-badge { display: inline-block; padding: 3px 10px; border-radius: 20px; font-size: .72rem; font-weight: 700; white-space: nowrap; }
+    .badge-pendente { background: rgba(245,158,11,.15); color: var(--warning); }
+    .badge-em_andamento { background: rgba(79,142,247,.15); color: var(--accent); }
+    .badge-atrasada { background: rgba(239,68,68,.15); color: var(--danger); }
+    .badge-aguardando_validacao { background: rgba(139,92,246,.15); color: var(--purple); }
+    .ativ-meta { font-size: .8rem; color: var(--text-muted); margin-bottom: 12px; }
+    .ativ-meta span { margin-right: 12px; }
+
+    .btn-big { width: 100%; padding: 16px; font-size: 1rem; font-weight: 700; border-radius: 10px; border: none; cursor: pointer; font-family: inherit; }
+    .btn-big.primary { background: var(--accent); color: #fff; }
+    .btn-big.primary:active { background: var(--accent-hover); }
+    .btn-big.wait { background: var(--surface-3); color: var(--text-muted); }
+
+    /* ── Execução em tela cheia ── */
+    .sheet { position: fixed; inset: 0; background: var(--bg); z-index: 300; display: flex; flex-direction: column; }
+    .sheet.hidden { display: none; }
+    .sheet-header { padding: 14px 16px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 12px; background: var(--surface); }
+    .sheet-header button { background: var(--surface-2); border: 1px solid var(--border); color: var(--text); width: 36px; height: 36px; border-radius: 8px; font-size: 1.1rem; cursor: pointer; }
+    .sheet-header .titulo { font-weight: 700; font-size: .98rem; flex: 1; }
+    .sheet-body { flex: 1; overflow-y: auto; padding: 16px 16px 24px; max-width: 640px; margin: 0 auto; width: 100%; }
+    .sheet-footer { padding: 14px 16px; border-top: 1px solid var(--border); background: var(--surface); }
+
+    .progress-bar { height: 6px; background: var(--surface-3); border-radius: 4px; overflow: hidden; margin-bottom: 18px; }
+    .progress-bar > div { height: 100%; background: var(--success); transition: width .2s; }
+
+    .step-row { display: flex; align-items: flex-start; gap: 12px; padding: 14px 12px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; margin-bottom: 8px; cursor: pointer; }
+    .step-row.done { border-color: var(--success); background: rgba(34,197,94,.06); }
+    .step-check { width: 26px; height: 26px; border-radius: 50%; border: 2px solid var(--border); flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: .85rem; margin-top: 1px; }
+    .step-row.done .step-check { background: var(--success); border-color: var(--success); color: #fff; }
+    .step-desc { font-size: .92rem; font-weight: 600; line-height: 1.4; }
+    .step-photo-req { font-size: .75rem; color: var(--warning); margin-top: 4px; }
+    .step-photo-req.ok { color: var(--success); }
+    .step-thumb { margin-top: 8px; max-width: 120px; border-radius: 6px; display: block; }
+    .step-actions { margin-top: 8px; display: flex; gap: 8px; }
+
+    .campo-block { margin-bottom: 16px; }
+    .campo-block label { display: block; font-size: .82rem; font-weight: 600; color: var(--text-muted); margin-bottom: 6px; }
+    .campo-block .req { color: var(--danger); }
+    .campo-block input, .campo-block textarea, .campo-block select {
+      width: 100%; padding: 10px 12px; background: var(--surface-2); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-size: .92rem; font-family: inherit;
+    }
+    .foto-btn { display: inline-flex; align-items: center; gap: 6px; padding: 10px 14px; background: var(--surface-2); border: 1px dashed var(--border); border-radius: 8px; color: var(--text-muted); font-size: .85rem; cursor: pointer; }
+
+    .alerta-box { background: rgba(245,158,11,.1); border: 1px solid rgba(245,158,11,.3); border-radius: 8px; padding: 12px 14px; font-size: .85rem; color: var(--warning); margin-bottom: 16px; }
+
+    .replan-link { display: inline-block; margin-top: 10px; font-size: .82rem; color: var(--text-muted); text-decoration: underline; cursor: pointer; background: none; border: none; font-family: inherit; }
+
+    .form-mini { margin-top: 10px; background: var(--surface-2); border: 1px solid var(--border); border-radius: 10px; padding: 14px; }
+    .form-mini.hidden { display: none; }
+
+    @media (min-width: 640px) { main { padding-top: 24px; } }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="header-inner">
+      <h1>📋 Gestão de Demandas</h1>
+      <span class="subtitle">via WhatsApp</span>
+    </div>
+  </header>
+
+  <nav class="nav-tabs">
+    <a href="/" class="nav-tab" id="nav-dashboard">Dashboard</a>
+    <a href="/calendario.html" class="nav-tab">📅 Calendário</a>
+    <a href="/hoje.html" class="nav-tab">☀️ Hoje</a>
+    <a href="/atividades.html" class="nav-tab active">🗒️ Atividades</a>
+    <a href="/atividades-gestao.html" class="nav-tab" id="nav-gestao-atividades" style="display:none">✅ Gestão de Atividades</a>
+    <a href="/configuracoes.html" class="nav-tab">⚙️ Configurações</a>
+    <a href="/admin.html" class="nav-tab" id="nav-admin" style="display:none">👥 Admin</a>
+  </nav>
+
+  <main>
+    <div class="score-card">
+      <div>
+        <div class="num" id="score-num">—</div>
+        <div class="label">Sua pontuação de execução</div>
+      </div>
+      <div class="score-mini">
+        <div><b id="score-concluidas">0</b>concluídas</div>
+        <div><b id="score-atrasadas">0</b>atrasadas</div>
+      </div>
+    </div>
+
+    <div class="section-title">🔴 Atrasadas <span class="count" id="count-atrasadas">0</span></div>
+    <div id="lista-atrasadas"></div>
+
+    <div class="section-title">📋 Pendentes hoje <span class="count" id="count-pendentes">0</span></div>
+    <div id="lista-pendentes"></div>
+
+    <div class="section-title">⏳ Aguardando validação do gestor <span class="count" id="count-aguardando">0</span></div>
+    <div id="lista-aguardando"></div>
+  </main>
+
+  <!-- Tela de execução em tela cheia -->
+  <div class="sheet hidden" id="sheet">
+    <div class="sheet-header">
+      <button id="sheet-close">✕</button>
+      <div class="titulo" id="sheet-titulo">Atividade</div>
+    </div>
+    <div class="sheet-body" id="sheet-body"></div>
+    <div class="sheet-footer" id="sheet-footer"></div>
+  </div>
+
+  <script src="/js/atividades-common.js"></script>
+  <script>
+    requireAuth();
+    montarHeaderUsuario();
+    const user = getCurrentUser();
+    if (user?.perfil === 'admin' || user?.pode_criar_atividades) document.getElementById('nav-gestao-atividades').style.display = '';
+
+    let ocorrencias = [];
+    let atual = null; // ocorrência aberta na tela de execução
+
+    async function uploadFoto(file) {
+      const fd = new FormData();
+      fd.append('foto', file);
+      const res = await fetch('/api/atividades/upload', { method: 'POST', headers: { Authorization: 'Bearer ' + getToken() }, body: fd });
+      if (!res.ok) throw new Error((await res.json().catch(() => ({}))).erro || 'Erro no upload da foto');
+      return (await res.json()).url;
+    }
+
+    function statusLabelAtiv(s) {
+      return { pendente: 'Pendente', em_andamento: 'Em andamento', atrasada: 'Atrasada', aguardando_validacao: 'Aguardando validação' }[s] || s;
+    }
+
+    function cardHTML(oc) {
+      const prazo = oc.nova_data_prevista || oc.data_referencia;
+      const horario = oc.novo_horario_previsto || oc.atividade.horario_limite;
+      const podeAgir = ['pendente', 'em_andamento', 'atrasada'].includes(oc.status);
+      return `<div class="ativ-card status-${oc.status}">
+        <div class="ativ-top">
+          <div class="ativ-titulo">${oc.atividade.titulo}</div>
+          <span class="ativ-badge badge-${oc.status}">${statusLabelAtiv(oc.status)}</span>
+        </div>
+        <div class="ativ-meta">
+          <span>📅 ${formatDate(prazo)}</span>
+          ${horario ? `<span>⏰ até ${horario}</span>` : ''}
+          ${oc.atividade.formato === 'checklist' ? `<span>☑️ ${oc.checklist.filter(i=>i.execucao.concluido).length}/${oc.checklist.length} passos</span>` : ''}
+        </div>
+        ${podeAgir ? `<button class="btn-big primary" onclick="abrirExecucao('${oc.id}')">${oc.status === 'atrasada' ? 'Concluir agora (atrasada)' : 'Abrir'}</button>`
+                    : `<button class="btn-big wait" disabled>Aguardando validação do gestor</button>`}
+      </div>`;
+    }
+
+    function render() {
+      const atrasadas = ocorrencias.filter(o => o.status === 'atrasada');
+      const pendentes = ocorrencias.filter(o => o.status === 'pendente' || o.status === 'em_andamento');
+      const aguardando = ocorrencias.filter(o => o.status === 'aguardando_validacao');
+
+      document.getElementById('count-atrasadas').textContent = atrasadas.length;
+      document.getElementById('count-pendentes').textContent = pendentes.length;
+      document.getElementById('count-aguardando').textContent = aguardando.length;
+
+      document.getElementById('lista-atrasadas').innerHTML = atrasadas.length ? atrasadas.map(cardHTML).join('') : '<div class="empty-msg">Nenhuma atividade atrasada. 🎉</div>';
+      document.getElementById('lista-pendentes').innerHTML = pendentes.length ? pendentes.map(cardHTML).join('') : '<div class="empty-msg">Nenhuma atividade pendente hoje.</div>';
+      document.getElementById('lista-aguardando').innerHTML = aguardando.length ? aguardando.map(cardHTML).join('') : '<div class="empty-msg">Nada aguardando validação.</div>';
+    }
+
+    async function carregarPontuacao() {
+      try {
+        const p = await api('/api/atividades/minhas/pontuacao');
+        const el = document.getElementById('score-num');
+        if (p.pontuacao === null) { el.textContent = '—'; el.className = 'num'; }
+        else {
+          el.textContent = p.pontuacao + '%';
+          el.className = 'num ' + (p.pontuacao >= 90 ? 'high' : p.pontuacao >= 70 ? 'mid' : 'low');
+        }
+        document.getElementById('score-concluidas').textContent = p.concluidas || 0;
+        document.getElementById('score-atrasadas').textContent = p.atrasadas || 0;
+      } catch (e) { /* silencioso */ }
+    }
+
+    async function carregar() {
+      try {
+        ocorrencias = await api('/api/atividades/minhas/hoje');
+        render();
+      } catch (e) {
+        document.getElementById('lista-pendentes').innerHTML = `<div class="empty-msg">Erro ao carregar: ${e.message} <br><button class="btn-secondary" onclick="carregar()">Tentar novamente</button></div>`;
+      }
+      carregarPontuacao();
+    }
+
+    // ── Execução ─────────────────────────────────────────────────────────────
+
+    function fecharSheet() { document.getElementById('sheet').classList.add('hidden'); atual = null; }
+    document.getElementById('sheet-close').onclick = fecharSheet;
+
+    async function abrirExecucao(id) {
+      atual = ocorrencias.find(o => o.id === id) || await api(`/api/atividades/ocorrencias/${id}`);
+      document.getElementById('sheet-titulo').textContent = atual.atividade.titulo;
+      document.getElementById('sheet').classList.remove('hidden');
+      renderSheet();
+    }
+
+    function renderSheet() {
+      const oc = atual, a = oc.atividade;
+      const body = document.getElementById('sheet-body');
+      const footer = document.getElementById('sheet-footer');
+      let html = '';
+
+      if (a.descricao) html += `<p style="color:var(--text-muted);font-size:.88rem;margin-bottom:16px;line-height:1.5">${a.descricao}</p>`;
+      if (oc.status === 'atrasada') html += `<div class="alerta-box">⚠️ Esta atividade está atrasada. Ao concluir, você precisará justificar o motivo.</div>`;
+
+      if (a.formato === 'checklist' && oc.checklist.length) {
+        const total = oc.checklist.length, feitos = oc.checklist.filter(i => i.execucao.concluido).length;
+        html += `<div class="progress-bar"><div style="width:${total ? (feitos/total*100) : 0}%"></div></div>`;
+        oc.checklist.forEach(item => {
+          const done = !!item.execucao.concluido;
+          html += `<div class="step-row ${done ? 'done' : ''}" onclick="toggleStep('${item.id}', ${!done})">
+            <div class="step-check">${done ? '✓' : ''}</div>
+            <div style="flex:1">
+              <div class="step-desc">${item.descricao}</div>
+              ${item.foto_obrigatoria ? `<div class="step-photo-req ${item.execucao.evidencia_url ? 'ok' : ''}">${item.execucao.evidencia_url ? '📷 Foto anexada' : '📷 Foto obrigatória'}</div>` : ''}
+              ${item.execucao.evidencia_url ? `<img class="step-thumb" src="${item.execucao.evidencia_url}" />` : ''}
+              ${item.foto_obrigatoria ? `<div class="step-actions" onclick="event.stopPropagation()">
+                <label class="foto-btn">📷 ${item.execucao.evidencia_url ? 'Trocar foto' : 'Tirar foto'}
+                  <input type="file" accept="image/*" capture="environment" style="display:none" onchange="fotoStep(event, '${item.id}')" />
+                </label>
+              </div>` : ''}
+            </div>
+          </div>`;
+        });
+      }
+
+      if (oc.campos.length) {
+        html += `<div style="margin-top:${a.formato==='checklist'?'20px':'0'}">`;
+        oc.campos.forEach(campo => {
+          const v = campo.valor || {};
+          html += `<div class="campo-block">
+            <label>${campo.rotulo} ${campo.obrigatorio ? '<span class="req">*</span>' : ''}</label>`;
+          if (campo.tipo === 'boolean') {
+            html += `<select onchange="salvarCampo('${campo.id}', this.value)">
+              <option value="">Selecione</option>
+              <option value="sim" ${v.valor==='sim'?'selected':''}>Sim</option>
+              <option value="nao" ${v.valor==='nao'?'selected':''}>Não</option>
+            </select>`;
+          } else if (campo.tipo === 'selecao') {
+            html += `<select onchange="salvarCampo('${campo.id}', this.value)">
+              <option value="">Selecione</option>
+              ${(campo.opcoes||[]).map(o => `<option value="${o}" ${v.valor===o?'selected':''}>${o}</option>`).join('')}
+            </select>`;
+          } else if (campo.tipo === 'foto') {
+            html += `<label class="foto-btn">📷 ${v.evidencia_url ? 'Trocar foto' : 'Tirar foto'}
+              <input type="file" accept="image/*" capture="environment" style="display:none" onchange="fotoCampo(event, '${campo.id}')" />
+            </label>`;
+            if (v.evidencia_url) html += `<img class="step-thumb" src="${v.evidencia_url}" />`;
+          } else {
+            html += `<input type="${campo.tipo==='numero'?'number':'text'}" value="${v.valor||''}" onblur="salvarCampo('${campo.id}', this.value)" placeholder="Digite aqui..." />`;
+          }
+          html += `</div>`;
+        });
+        html += `</div>`;
+      }
+
+      if (a.formato === 'simples') {
+        html += `<div class="campo-block">
+          <label>Comentário (opcional)</label>
+          <textarea id="comentario-simples" rows="3" placeholder="Alguma observação?"></textarea>
+        </div>`;
+        if (a.exige_foto) {
+          html += `<div class="campo-block"><label>Foto <span class="req">*</span></label>
+            <label class="foto-btn">📷 ${oc._evidenciaSimples ? 'Trocar foto' : 'Tirar foto'}
+              <input type="file" accept="image/*" capture="environment" style="display:none" onchange="fotoSimples(event)" />
+            </label>
+            ${oc._evidenciaSimples ? `<img class="step-thumb" src="${oc._evidenciaSimples}" />` : ''}
+          </div>`;
+        }
+      }
+
+      if (oc.status === 'atrasada') {
+        html += `<div class="campo-block"><label>Justificativa do atraso <span class="req">*</span></label>
+          <textarea id="justificativa-atraso" rows="2" placeholder="Por que esta atividade está atrasada?"></textarea>
+        </div>`;
+      }
+
+      if (a.permite_replanejamento) {
+        html += `<button class="replan-link" onclick="toggleReplan()">📅 Solicitar novo prazo</button>
+        <div class="form-mini hidden" id="form-replan">
+          <div class="campo-block"><label>Nova data</label><input type="date" id="replan-data" /></div>
+          <div class="campo-block"><label>Novo horário (opcional)</label><input type="time" id="replan-horario" /></div>
+          <div class="campo-block"><label>Motivo</label><textarea id="replan-motivo" rows="2" placeholder="Explique o motivo do replanejamento"></textarea></div>
+          <button class="btn-secondary" onclick="enviarReplan()">Enviar pedido</button>
+        </div>`;
+      }
+
+      body.innerHTML = html;
+      footer.innerHTML = `<button class="btn-big primary" onclick="submeter()">✅ Concluir atividade</button>`;
+    }
+
+    function toggleReplan() { document.getElementById('form-replan').classList.toggle('hidden'); }
+
+    async function enviarReplan() {
+      const nova_data = document.getElementById('replan-data').value;
+      const novo_horario = document.getElementById('replan-horario').value;
+      const motivo = document.getElementById('replan-motivo').value;
+      if (!nova_data || !motivo.trim()) return showToast('Preencha data e motivo', 'warn');
+      try {
+        await api(`/api/atividades/ocorrencias/${atual.id}/replanejar`, { method: 'POST', body: { nova_data, novo_horario: novo_horario || null, motivo } });
+        showToast('Pedido de replanejamento enviado ao gestor', 'ok');
+        toggleReplan();
+      } catch (e) { showToast('❌ ' + e.message, 'err'); }
+    }
+
+    async function toggleStep(itemId, concluir) {
+      const item = atual.checklist.find(i => i.id === itemId);
+      if (concluir && item.foto_obrigatoria && !item.execucao.evidencia_url) {
+        return showToast('Este passo exige uma foto antes de concluir', 'warn');
+      }
+      try {
+        atual = await api(`/api/atividades/ocorrencias/${atual.id}/checklist/${itemId}`, {
+          method: 'PUT', body: { concluido: concluir, evidencia_url: item.execucao.evidencia_url, comentario: item.execucao.comentario },
+        });
+        renderSheet();
+      } catch (e) { showToast('❌ ' + e.message, 'err'); }
+    }
+
+    async function fotoStep(ev, itemId) {
+      const file = ev.target.files[0]; if (!file) return;
+      showToast('Enviando foto...', 'warn');
+      try {
+        const url = await uploadFoto(file);
+        atual = await api(`/api/atividades/ocorrencias/${atual.id}/checklist/${itemId}`, { method: 'PUT', body: { concluido: true, evidencia_url: url } });
+        showToast('Foto anexada', 'ok');
+        renderSheet();
+      } catch (e) { showToast('❌ ' + e.message, 'err'); }
+    }
+
+    async function salvarCampo(campoId, valor) {
+      try {
+        atual = await api(`/api/atividades/ocorrencias/${atual.id}/campos/${campoId}`, { method: 'PUT', body: { valor } });
+      } catch (e) { showToast('❌ ' + e.message, 'err'); }
+    }
+
+    async function fotoCampo(ev, campoId) {
+      const file = ev.target.files[0]; if (!file) return;
+      showToast('Enviando foto...', 'warn');
+      try {
+        const url = await uploadFoto(file);
+        atual = await api(`/api/atividades/ocorrencias/${atual.id}/campos/${campoId}`, { method: 'PUT', body: { evidencia_url: url } });
+        showToast('Foto anexada', 'ok');
+        renderSheet();
+      } catch (e) { showToast('❌ ' + e.message, 'err'); }
+    }
+
+    async function fotoSimples(ev) {
+      const file = ev.target.files[0]; if (!file) return;
+      showToast('Enviando foto...', 'warn');
+      try {
+        atual._evidenciaSimples = await uploadFoto(file);
+        showToast('Foto anexada', 'ok');
+        renderSheet();
+      } catch (e) { showToast('❌ ' + e.message, 'err'); }
+    }
+
+    async function submeter() {
+      const body = {
+        comentario_execucao: document.getElementById('comentario-simples')?.value || null,
+        evidencia_url: atual._evidenciaSimples || null,
+        justificativa_atraso: document.getElementById('justificativa-atraso')?.value || null,
+      };
+      try {
+        await api(`/api/atividades/ocorrencias/${atual.id}/submeter`, { method: 'POST', body });
+        showToast('Atividade enviada!', 'ok');
+        fecharSheet();
+        carregar();
+      } catch (e) { showToast('❌ ' + e.message, 'err'); }
+    }
+
+    carregar();
+    setInterval(carregar, 60000);
+  </script>
+</body>
+</html>

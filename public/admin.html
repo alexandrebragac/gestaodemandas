@@ -54,6 +54,8 @@
     <a href="/" class="nav-tab" id="nav-dashboard">Dashboard</a>
     <a href="/calendario.html" class="nav-tab" id="nav-calendario">📅 Calendário</a>
     <a href="/hoje.html" class="nav-tab" id="nav-hoje">☀️ Hoje</a>
+    <a href="/atividades.html" class="nav-tab">🗒️ Atividades</a>
+    <a href="/atividades-gestao.html" class="nav-tab">✅ Gestão de Atividades</a>
     <a href="/configuracoes.html" class="nav-tab" id="nav-config">⚙️ Configurações</a>
     <a href="/admin.html" class="nav-tab active" id="nav-admin">👥 Admin</a>
   </nav>
@@ -85,9 +87,9 @@
       <div style="overflow-x:auto">
         <table id="tabela-usuarios">
           <thead><tr>
-            <th>Nome</th><th>Email</th><th>WhatsApp</th><th>Canal</th><th>Perfil</th><th>Ações</th>
+            <th>Nome</th><th>Email</th><th>WhatsApp</th><th>Canal</th><th>Perfil</th><th>Atividades</th><th>Ações</th>
           </tr></thead>
-          <tbody id="tbody-usuarios"><tr><td colspan="6" style="color:var(--text-muted)">Carregando...</td></tr></tbody>
+          <tbody id="tbody-usuarios"><tr><td colspan="7" style="color:var(--text-muted)">Carregando...</td></tr></tbody>
         </table>
       </div>
     </div>
@@ -225,6 +227,11 @@
           <td><span class="canal-badge canal-${u.canal||'whatsapp'}">${CANAL_LABEL[u.canal||'whatsapp']}</span></td>
           <td><span class="badge-${u.perfil||'usuario'}">${(u.perfil||'usuario')==='admin'?'Admin':'Usuário'}</span></td>
           <td>
+            <button class="btn-sm" onclick="alternarGestorAtividades('${u.id}', ${u.pode_criar_atividades ? 0 : 1})" title="Permite criar e gerir atividades da rotina diária">
+              ${u.pode_criar_atividades ? '✅ Pode gerir' : '➕ Conceder'}
+            </button>
+          </td>
+          <td>
             <div class="action-btns">
               <button class="btn-sm" onclick="abrirEdicao('${u.id}')">✏️ Editar</button>
               <button class="btn-sm" onclick="enviarRecadastro('${u.id}','${u.nome}')" title="Reenviar link de ativação do WhatsApp">📲 Recadastro</button>
@@ -233,6 +240,13 @@
           </td>
         </tr>
       `).join('');
+    }
+
+    async function alternarGestorAtividades(id, novoValor) {
+      try {
+        await api(`/api/usuarios/${id}/gestor-atividades`, { method: 'PUT', body: { pode_criar_atividades: !!novoValor } });
+        await carregarUsuarios();
+      } catch (err) { alert('Erro: ' + err.message); }
     }
 
     function popularSelects() {

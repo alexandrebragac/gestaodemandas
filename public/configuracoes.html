@@ -65,6 +65,8 @@
     <a href="/" class="nav-tab" id="nav-dashboard">Dashboard</a>
     <a href="/calendario.html" class="nav-tab" id="nav-calendario">📅 Calendário</a>
     <a href="/hoje.html" class="nav-tab" id="nav-hoje">☀️ Hoje</a>
+    <a href="/atividades.html" class="nav-tab">🗒️ Atividades</a>
+    <a href="/atividades-gestao.html" class="nav-tab" id="nav-gestao-atividades" style="display:none">✅ Gestão de Atividades</a>
     <a href="/configuracoes.html" class="nav-tab active" id="nav-config">⚙️ Configurações</a>
     <a href="/admin.html" class="nav-tab" id="nav-admin" style="display:none">👥 Admin</a>
   </nav>
@@ -305,6 +307,9 @@
         <span style="font-size:.85rem;color:var(--text-muted)">Olá, <strong style="color:var(--text)">${currentUser.nome.split(' ')[0]}</strong></span>
         <button onclick="logout()" style="padding:5px 12px;background:transparent;border:1px solid var(--border);border-radius:6px;color:var(--text-muted);font-size:.8rem;cursor:pointer;font-family:inherit" onmouseover="this.style.color='var(--danger)';this.style.borderColor='var(--danger)'" onmouseout="this.style.color='var(--text-muted)';this.style.borderColor='var(--border)'">Sair</button>
       `;
+      if (currentUser.perfil === 'admin' || currentUser.pode_criar_atividades) {
+        document.getElementById('nav-gestao-atividades').style.display = '';
+      }
     }
 
     carregarConfiguracoes();

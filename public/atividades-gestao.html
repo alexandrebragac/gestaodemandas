@@ -1,0 +1,451 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Gestão de Atividades — Gestão de Demandas</title>
+  <link rel="stylesheet" href="/css/style.css" />
+  <style>
+    main { max-width: 900px; margin: 0 auto; padding: 20px 16px 80px; }
+
+    .tabs { display: flex; gap: 4px; margin-bottom: 20px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 4px; }
+    .tab-btn { flex: 1; padding: 10px; text-align: center; border-radius: 7px; font-size: .85rem; font-weight: 600; color: var(--text-muted); cursor: pointer; border: none; background: none; font-family: inherit; }
+    .tab-btn.active { background: var(--accent); color: #fff; }
+    .tab-panel { display: none; }
+    .tab-panel.active { display: block; }
+
+    .section-title { font-size: .82rem; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--text-muted); margin: 22px 0 10px; display: flex; align-items: center; gap: 8px; }
+    .section-title .count { background: var(--surface-3); padding: 2px 8px; border-radius: 10px; font-size: .72rem; }
+    .empty-msg { color: var(--text-muted); font-size: .88rem; padding: 24px; text-align: center; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); }
+
+    .aprov-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 16px; margin-bottom: 12px; }
+    .aprov-top { display: flex; justify-content: space-between; gap: 10px; margin-bottom: 6px; }
+    .aprov-titulo { font-weight: 700; font-size: .96rem; }
+    .aprov-meta { font-size: .8rem; color: var(--text-muted); margin-bottom: 10px; }
+    .aprov-detalhe { background: var(--surface-2); border-radius: 8px; padding: 10px 12px; font-size: .83rem; margin-bottom: 10px; }
+    .aprov-detalhe .linha { display: flex; justify-content: space-between; padding: 3px 0; border-bottom: 1px solid var(--border-light); }
+    .aprov-detalhe .linha:last-child { border-bottom: none; }
+    .aprov-thumb { max-width: 100px; border-radius: 6px; margin: 4px 4px 0 0; display: inline-block; }
+    .aprov-acoes { display: flex; gap: 8px; }
+    .btn-aprovar { flex: 1; padding: 11px; background: var(--success); color: #fff; border: none; border-radius: 8px; font-weight: 700; cursor: pointer; font-family: inherit; }
+    .btn-recusar { flex: 1; padding: 11px; background: transparent; color: var(--danger); border: 1px solid var(--danger); border-radius: 8px; font-weight: 700; cursor: pointer; font-family: inherit; }
+    .recusa-box { margin-top: 10px; display: none; }
+    .recusa-box.show { display: block; }
+    .recusa-box textarea { width: 100%; padding: 8px 10px; background: var(--surface-2); border: 1px solid var(--border); border-radius: 6px; color: var(--text); font-family: inherit; font-size: .85rem; margin-bottom: 8px; }
+
+    .ativ-list-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 14px 16px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+    .ativ-list-info .titulo { font-weight: 700; font-size: .92rem; }
+    .ativ-list-info .meta { font-size: .78rem; color: var(--text-muted); margin-top: 3px; }
+    .ativ-list-actions { display: flex; gap: 6px; }
+
+    fieldset { border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 16px; margin-bottom: 16px; }
+    legend { padding: 0 8px; font-size: .82rem; font-weight: 700; color: var(--accent); }
+    .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    @media (max-width: 620px) { .row2 { grid-template-columns: 1fr; } }
+    .checkbox-line { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; font-size: .85rem; color: var(--text); }
+    .checkbox-line input { width: auto; margin: 0; }
+
+    .dyn-item { background: var(--surface-2); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; margin-bottom: 8px; }
+    .dyn-item .dyn-row { display: flex; gap: 8px; align-items: center; }
+    .dyn-item input[type=text] { flex: 1; }
+    .dyn-item .checkbox-line { margin: 6px 0 0; }
+    .btn-remove { background: none; border: none; color: var(--danger); cursor: pointer; font-size: 1rem; padding: 4px 8px; }
+    .btn-add-dyn { padding: 8px 14px; background: var(--surface-2); border: 1px dashed var(--border); border-radius: 8px; color: var(--text-muted); cursor: pointer; font-size: .83rem; font-family: inherit; }
+
+    .dias-semana { display: flex; gap: 6px; flex-wrap: wrap; }
+    .dia-chip { padding: 7px 12px; border: 1px solid var(--border); border-radius: 20px; font-size: .8rem; cursor: pointer; background: var(--surface-2); color: var(--text-muted); }
+    .dia-chip.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="header-inner">
+      <h1>📋 Gestão de Demandas</h1>
+      <span class="subtitle">via WhatsApp</span>
+    </div>
+  </header>
+
+  <nav class="nav-tabs">
+    <a href="/" class="nav-tab" id="nav-dashboard">Dashboard</a>
+    <a href="/calendario.html" class="nav-tab">📅 Calendário</a>
+    <a href="/hoje.html" class="nav-tab">☀️ Hoje</a>
+    <a href="/atividades.html" class="nav-tab">🗒️ Atividades</a>
+    <a href="/atividades-gestao.html" class="nav-tab active">✅ Gestão de Atividades</a>
+    <a href="/configuracoes.html" class="nav-tab">⚙️ Configurações</a>
+    <a href="/admin.html" class="nav-tab" id="nav-admin" style="display:none">👥 Admin</a>
+  </nav>
+
+  <main>
+    <div class="tabs">
+      <button class="tab-btn active" data-tab="aprovacoes">✅ Aprovações <span id="badge-aprovacoes"></span></button>
+      <button class="tab-btn" data-tab="lista">🗒️ Minhas Atividades</button>
+      <button class="tab-btn" data-tab="nova">➕ Nova Atividade</button>
+    </div>
+
+    <!-- ── Aprovações ── -->
+    <div class="tab-panel active" id="panel-aprovacoes">
+      <div class="section-title">Conclusões para validar <span class="count" id="count-conclusoes">0</span></div>
+      <div id="lista-conclusoes"></div>
+
+      <div class="section-title">Pedidos de replanejamento <span class="count" id="count-replan">0</span></div>
+      <div id="lista-replan"></div>
+    </div>
+
+    <!-- ── Lista de atividades ── -->
+    <div class="tab-panel" id="panel-lista">
+      <div id="lista-atividades"></div>
+    </div>
+
+    <!-- ── Nova atividade ── -->
+    <div class="tab-panel" id="panel-nova">
+      <form id="form-atividade">
+        <fieldset>
+          <legend>1. O que e quem</legend>
+          <label>Título <input type="text" id="f-titulo" required placeholder="Ex: Checklist de abertura da loja" /></label>
+          <label>Descrição <textarea id="f-descricao" rows="2" placeholder="Detalhe o que precisa ser feito"></textarea></label>
+          <div class="row2">
+            <label>Responsável <select id="f-responsavel" required></select></label>
+            <label>Área <select id="f-area">
+              <option value="operacoes">Operações</option>
+              <option value="comercial">Comercial</option>
+              <option value="financeiro">Financeiro</option>
+              <option value="pessoas">Pessoas</option>
+              <option value="performance">Performance</option>
+              <option value="outro">Outro</option>
+            </select></label>
+          </div>
+          <label>Prioridade <select id="f-prioridade">
+            <option value="baixa">Baixa</option>
+            <option value="media" selected>Média</option>
+            <option value="alta">Alta</option>
+            <option value="critica">Crítica</option>
+          </select></label>
+        </fieldset>
+
+        <fieldset>
+          <legend>2. Quando</legend>
+          <div class="row2">
+            <label>Tipo <select id="f-tipo">
+              <option value="recorrente">Recorrente</option>
+              <option value="pontual">Pontual (única vez)</option>
+            </select></label>
+            <label id="wrap-recorrencia">Repete <select id="f-recorrencia">
+              <option value="diaria">Todo dia</option>
+              <option value="semanal">Toda semana em...</option>
+              <option value="mensal">Todo mês no dia...</option>
+            </select></label>
+          </div>
+          <div id="wrap-dias-semana" style="margin-bottom:10px;display:none">
+            <label style="margin-bottom:6px">Dias da semana</label>
+            <div class="dias-semana">
+              <span class="dia-chip" data-d="0">Dom</span><span class="dia-chip" data-d="1">Seg</span>
+              <span class="dia-chip" data-d="2">Ter</span><span class="dia-chip" data-d="3">Qua</span>
+              <span class="dia-chip" data-d="4">Qui</span><span class="dia-chip" data-d="5">Sex</span>
+              <span class="dia-chip" data-d="6">Sáb</span>
+            </div>
+          </div>
+          <div id="wrap-dia-mes" style="display:none">
+            <label>Dia do mês <input type="number" id="f-dia-mes" min="1" max="31" placeholder="Ex: 5" /></label>
+          </div>
+          <div class="row2">
+            <label>Data de início <input type="date" id="f-data-inicio" required /></label>
+            <label>Data de fim (opcional) <input type="date" id="f-data-fim" /></label>
+          </div>
+          <label>Horário limite (opcional) <input type="time" id="f-horario" /></label>
+        </fieldset>
+
+        <fieldset>
+          <legend>3. Checklist (opcional — deixe vazio para atividade simples)</legend>
+          <div id="lista-checklist"></div>
+          <button type="button" class="btn-add-dyn" onclick="addChecklistItem()">+ Adicionar passo</button>
+        </fieldset>
+
+        <fieldset>
+          <legend>4. Campos extras (opcional)</legend>
+          <div id="lista-campos"></div>
+          <button type="button" class="btn-add-dyn" onclick="addCampo()">+ Adicionar campo</button>
+        </fieldset>
+
+        <fieldset>
+          <legend>5. Regras</legend>
+          <div class="checkbox-line"><input type="checkbox" id="f-exige-aprovacao" checked /> <label for="f-exige-aprovacao" style="margin:0">Exige validação do gestor ao concluir</label></div>
+          <div class="checkbox-line"><input type="checkbox" id="f-exige-foto" /> <label for="f-exige-foto" style="margin:0">Exige foto de evidência (atividade simples)</label></div>
+          <div class="checkbox-line"><input type="checkbox" id="f-permite-replan" checked /> <label for="f-permite-replan" style="margin:0">Permite o responsável solicitar novo prazo</label></div>
+        </fieldset>
+
+        <button type="submit" class="btn-primary" style="padding:14px;font-size:1rem">Criar Atividade</button>
+      </form>
+      <div id="form-msg" class="form-msg"></div>
+    </div>
+  </main>
+
+  <script src="/js/atividades-common.js"></script>
+  <script>
+    requireAuth();
+    montarHeaderUsuario();
+    const user = getCurrentUser();
+    if (user?.perfil !== 'admin' && !user?.pode_criar_atividades) {
+      document.body.innerHTML = '<main style="max-width:500px;margin:60px auto;text-align:center;color:var(--text-muted)"><h2 style="color:var(--text);margin-bottom:10px">Acesso restrito</h2>Você não tem permissão para gerir atividades. Fale com um administrador.</main>';
+      throw new Error('sem permissão');
+    }
+
+    // ── Tabs ─────────────────────────────────────────────────────────────────
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+      btn.onclick = () => {
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+        btn.classList.add('active');
+        document.getElementById('panel-' + btn.dataset.tab).classList.add('active');
+        if (btn.dataset.tab === 'lista') carregarLista();
+      };
+    });
+
+    // ── Tipo/recorrência dinâmica ────────────────────────────────────────────
+    document.getElementById('f-tipo').onchange = e => {
+      document.getElementById('wrap-recorrencia').style.display = e.target.value === 'pontual' ? 'none' : '';
+      atualizarRecorrenciaUI();
+    };
+    document.getElementById('f-recorrencia').onchange = atualizarRecorrenciaUI;
+    function atualizarRecorrenciaUI() {
+      const tipo = document.getElementById('f-tipo').value;
+      const rec = document.getElementById('f-recorrencia').value;
+      document.getElementById('wrap-dias-semana').style.display = (tipo === 'recorrente' && rec === 'semanal') ? '' : 'none';
+      document.getElementById('wrap-dia-mes').style.display = (tipo === 'recorrente' && rec === 'mensal') ? '' : 'none';
+    }
+    document.querySelectorAll('.dia-chip').forEach(chip => chip.onclick = () => chip.classList.toggle('active'));
+
+    // ── Checklist dinâmico ───────────────────────────────────────────────────
+    let checklistCount = 0;
+    function addChecklistItem() {
+      const id = 'ck' + (checklistCount++);
+      const div = document.createElement('div');
+      div.className = 'dyn-item';
+      div.id = id;
+      div.innerHTML = `
+        <div class="dyn-row">
+          <input type="text" placeholder="Descrição do passo" class="ck-desc" />
+          <button type="button" class="btn-remove" onclick="document.getElementById('${id}').remove()">✕</button>
+        </div>
+        <div class="checkbox-line"><input type="checkbox" class="ck-foto" /> <label style="margin:0">Exige foto neste passo</label></div>`;
+      document.getElementById('lista-checklist').appendChild(div);
+    }
+
+    // ── Campos customizados dinâmicos ───────────────────────────────────────
+    let campoCount = 0;
+    function addCampo() {
+      const id = 'cp' + (campoCount++);
+      const div = document.createElement('div');
+      div.className = 'dyn-item';
+      div.id = id;
+      div.innerHTML = `
+        <div class="dyn-row">
+          <input type="text" placeholder="Nome do campo (ex: Temperatura)" class="cp-rotulo" />
+          <select class="cp-tipo" style="width:140px">
+            <option value="texto">Texto</option>
+            <option value="numero">Número</option>
+            <option value="boolean">Sim/Não</option>
+            <option value="selecao">Seleção</option>
+            <option value="foto">Foto</option>
+          </select>
+          <button type="button" class="btn-remove" onclick="document.getElementById('${id}').remove()">✕</button>
+        </div>
+        <input type="text" class="cp-opcoes" placeholder="Opções separadas por vírgula (só p/ Seleção)" style="margin-top:8px;display:none" />
+        <div class="checkbox-line"><input type="checkbox" class="cp-obrigatorio" /> <label style="margin:0">Obrigatório</label></div>
+        <div class="checkbox-line"><input type="checkbox" class="cp-foto" /> <label style="margin:0">Exige foto além da resposta</label></div>`;
+      div.querySelector('.cp-tipo').onchange = e => {
+        div.querySelector('.cp-opcoes').style.display = e.target.value === 'selecao' ? '' : 'none';
+      };
+      document.getElementById('lista-campos').appendChild(div);
+    }
+
+    // ── Popular selects de usuários ──────────────────────────────────────────
+    async function carregarUsuariosSelect() {
+      const usuarios = await api('/api/usuarios');
+      document.getElementById('f-responsavel').innerHTML = usuarios.map(u => `<option value="${u.id}">${u.nome}</option>`).join('');
+    }
+
+    // ── Submeter formulário ──────────────────────────────────────────────────
+    document.getElementById('form-atividade').addEventListener('submit', async e => {
+      e.preventDefault();
+      const checklist = [...document.querySelectorAll('#lista-checklist .dyn-item')].map(el => ({
+        descricao: el.querySelector('.ck-desc').value.trim(),
+        foto_obrigatoria: el.querySelector('.ck-foto').checked,
+      })).filter(i => i.descricao);
+
+      const campos = [...document.querySelectorAll('#lista-campos .dyn-item')].map(el => ({
+        rotulo: el.querySelector('.cp-rotulo').value.trim(),
+        tipo: el.querySelector('.cp-tipo').value,
+        obrigatorio: el.querySelector('.cp-obrigatorio').checked,
+        exige_foto: el.querySelector('.cp-foto').checked,
+        opcoes: el.querySelector('.cp-tipo').value === 'selecao'
+          ? el.querySelector('.cp-opcoes').value.split(',').map(s => s.trim()).filter(Boolean)
+          : null,
+      })).filter(c => c.rotulo);
+
+      const tipo = document.getElementById('f-tipo').value;
+      const dias = [...document.querySelectorAll('.dia-chip.active')].map(c => parseInt(c.dataset.d));
+
+      const body = {
+        titulo: document.getElementById('f-titulo').value.trim(),
+        descricao: document.getElementById('f-descricao').value.trim() || null,
+        responsavel_id: document.getElementById('f-responsavel').value,
+        area: document.getElementById('f-area').value,
+        prioridade: document.getElementById('f-prioridade').value,
+        tipo,
+        recorrencia_tipo: tipo === 'pontual' ? 'unica' : document.getElementById('f-recorrencia').value,
+        recorrencia_dias_semana: dias.length ? dias : null,
+        recorrencia_dia_mes: document.getElementById('f-dia-mes').value ? parseInt(document.getElementById('f-dia-mes').value) : null,
+        data_inicio: document.getElementById('f-data-inicio').value,
+        data_fim: document.getElementById('f-data-fim').value || null,
+        horario_limite: document.getElementById('f-horario').value || null,
+        exige_aprovacao: document.getElementById('f-exige-aprovacao').checked,
+        exige_foto: document.getElementById('f-exige-foto').checked,
+        permite_replanejamento: document.getElementById('f-permite-replan').checked,
+        checklist, campos,
+      };
+
+      try {
+        await api('/api/atividades', { method: 'POST', body });
+        showToast('Atividade criada com sucesso!', 'ok');
+        e.target.reset();
+        document.getElementById('lista-checklist').innerHTML = '';
+        document.getElementById('lista-campos').innerHTML = '';
+        document.querySelectorAll('.dia-chip').forEach(c => c.classList.remove('active'));
+        document.querySelector('[data-tab="lista"]').click();
+      } catch (err) {
+        showToast('❌ ' + err.message, 'err');
+      }
+    });
+
+    // ── Lista de atividades ──────────────────────────────────────────────────
+    async function carregarLista() {
+      const el = document.getElementById('lista-atividades');
+      el.innerHTML = '<div class="empty-msg">Carregando...</div>';
+      try {
+        const atividades = await api('/api/atividades');
+        if (!atividades.length) { el.innerHTML = '<div class="empty-msg">Nenhuma atividade cadastrada ainda. Crie a primeira na aba "Nova Atividade".</div>'; return; }
+        el.innerHTML = atividades.map(a => `
+          <div class="ativ-list-card">
+            <div class="ativ-list-info">
+              <div class="titulo">${a.titulo}</div>
+              <div class="meta">👤 ${a.responsavel_nome || '—'} · ${a.tipo === 'pontual' ? 'Pontual' : 'Recorrente (' + a.recorrencia_tipo + ')'} ${a.formato === 'checklist' ? '· ☑️ ' + a.checklist.length + ' passos' : ''}</div>
+            </div>
+            <div class="ativ-list-actions">
+              <button class="btn-icon" title="Excluir" onclick="excluirAtividade('${a.id}', '${a.titulo.replace(/'/g,"\\'")}')">🗑️</button>
+            </div>
+          </div>`).join('');
+      } catch (e) {
+        el.innerHTML = `<div class="empty-msg">Erro ao carregar: ${e.message}</div>`;
+      }
+    }
+
+    async function excluirAtividade(id, titulo) {
+      if (!confirm(`Excluir a atividade "${titulo}"? Isso não afeta ocorrências já geradas.`)) return;
+      try {
+        await api(`/api/atividades/${id}`, { method: 'DELETE' });
+        showToast('Atividade removida', 'ok');
+        carregarLista();
+      } catch (e) { showToast('❌ ' + e.message, 'err'); }
+    }
+
+    // ── Aprovações ───────────────────────────────────────────────────────────
+    function fmtDate(iso) { if (!iso) return '—'; const [y,m,d] = iso.slice(0,10).split('-'); return `${d}/${m}/${y}`; }
+
+    async function carregarAprovacoes() {
+      try {
+        const { conclusoes, replanejamentos } = await api('/api/atividades/aprovacoes/pendentes');
+        document.getElementById('count-conclusoes').textContent = conclusoes.length;
+        document.getElementById('count-replan').textContent = replanejamentos.length;
+        const badge = document.getElementById('badge-aprovacoes');
+        const total = conclusoes.length + replanejamentos.length;
+        badge.textContent = total ? `(${total})` : '';
+
+        document.getElementById('lista-conclusoes').innerHTML = conclusoes.length ? conclusoes.map(conclusaoHTML).join('') : '<div class="empty-msg">Nada para validar. 🎉</div>';
+        document.getElementById('lista-replan').innerHTML = replanejamentos.length ? replanejamentos.map(replanHTML).join('') : '<div class="empty-msg">Nenhum pedido de replanejamento.</div>';
+      } catch (e) {
+        document.getElementById('lista-conclusoes').innerHTML = `<div class="empty-msg">Erro ao carregar: ${e.message}</div>`;
+      }
+    }
+
+    function conclusaoHTML(oc) {
+      const checklistHtml = oc.checklist.length
+        ? oc.checklist.map(i => `<div class="linha"><span>${i.execucao.concluido ? '✅' : '⬜'} ${i.descricao}</span>${i.execucao.evidencia_url ? `<a href="${i.execucao.evidencia_url}" target="_blank">ver foto</a>` : ''}</div>`).join('')
+        : '';
+      const camposHtml = oc.campos.length
+        ? oc.campos.map(c => `<div class="linha"><span>${c.rotulo}</span><b>${c.valor.valor || (c.valor.evidencia_url ? 'foto anexada' : '—')}</b></div>`).join('')
+        : '';
+      return `<div class="aprov-card" id="conc-${oc.id}">
+        <div class="aprov-top">
+          <div class="aprov-titulo">${oc.atividade.titulo}</div>
+          <span class="ativ-badge badge-aguardando_validacao" style="background:rgba(139,92,246,.15);color:var(--purple);border-radius:20px;padding:3px 10px;font-size:.72rem;font-weight:700">Aguardando validação</span>
+        </div>
+        <div class="aprov-meta">👤 ${oc.responsavel?.nome || '—'} · 📅 ref. ${fmtDate(oc.data_referencia)}${oc.status === 'atrasada' ? ' · atrasada' : ''}</div>
+        ${(checklistHtml || camposHtml || oc.comentario_execucao || oc.justificativa_atraso) ? `<div class="aprov-detalhe">
+          ${checklistHtml}${camposHtml}
+          ${oc.comentario_execucao ? `<div class="linha"><span>Comentário</span><b>${oc.comentario_execucao}</b></div>` : ''}
+          ${oc.justificativa_atraso ? `<div class="linha"><span>Justificativa do atraso</span><b>${oc.justificativa_atraso}</b></div>` : ''}
+          ${oc.evidencia_url ? `<a href="${oc.evidencia_url}" target="_blank"><img class="aprov-thumb" src="${oc.evidencia_url}" /></a>` : ''}
+        </div>` : ''}
+        <div class="aprov-acoes">
+          <button class="btn-aprovar" onclick="decidirConclusao('${oc.id}', true)">✅ Aprovar</button>
+          <button class="btn-recusar" onclick="toggleRecusa('conc-${oc.id}')">❌ Recusar</button>
+        </div>
+        <div class="recusa-box" id="recusa-conc-${oc.id}">
+          <textarea rows="2" placeholder="Motivo da recusa (obrigatório)" id="motivo-conc-${oc.id}"></textarea>
+          <button class="btn-secondary" onclick="decidirConclusao('${oc.id}', false)">Confirmar recusa</button>
+        </div>
+      </div>`;
+    }
+
+    function replanHTML(r) {
+      return `<div class="aprov-card" id="rep-${r.id}">
+        <div class="aprov-top">
+          <div class="aprov-titulo">${r.ocorrencia.atividade.titulo}</div>
+        </div>
+        <div class="aprov-meta">👤 ${r.ocorrencia.responsavel?.nome || '—'}</div>
+        <div class="aprov-detalhe">
+          <div class="linha"><span>Data original</span><b>${fmtDate(r.ocorrencia.data_referencia)}</b></div>
+          <div class="linha"><span>Nova data solicitada</span><b>${fmtDate(r.nova_data)}${r.novo_horario ? ' às ' + r.novo_horario : ''}</b></div>
+          <div class="linha"><span>Motivo</span><b>${r.motivo}</b></div>
+        </div>
+        <div class="aprov-acoes">
+          <button class="btn-aprovar" onclick="decidirReplan('${r.id}', true)">✅ Aprovar</button>
+          <button class="btn-recusar" onclick="toggleRecusa('rep-${r.id}')">❌ Recusar</button>
+        </div>
+        <div class="recusa-box" id="recusa-rep-${r.id}">
+          <textarea rows="2" placeholder="Motivo da recusa (obrigatório)" id="motivo-rep-${r.id}"></textarea>
+          <button class="btn-secondary" onclick="decidirReplan('${r.id}', false)">Confirmar recusa</button>
+        </div>
+      </div>`;
+    }
+
+    function toggleRecusa(cardId) { document.getElementById('recusa-' + cardId).classList.toggle('show'); }
+
+    async function decidirConclusao(id, aprovar) {
+      const motivo_recusa = document.getElementById(`motivo-conc-${id}`)?.value;
+      if (!aprovar && !(motivo_recusa || '').trim()) return showToast('Informe o motivo da recusa', 'warn');
+      try {
+        await api(`/api/atividades/ocorrencias/${id}/validar`, { method: 'POST', body: { aprovar, motivo_recusa } });
+        showToast(aprovar ? 'Conclusão validada!' : 'Devolvida ao responsável', 'ok');
+        carregarAprovacoes();
+      } catch (e) { showToast('❌ ' + e.message, 'err'); }
+    }
+
+    async function decidirReplan(id, aprovar) {
+      const motivo_recusa = document.getElementById(`motivo-rep-${id}`)?.value;
+      if (!aprovar && !(motivo_recusa || '').trim()) return showToast('Informe o motivo da recusa', 'warn');
+      try {
+        await api(`/api/atividades/replanejamentos/${id}/decidir`, { method: 'POST', body: { aprovar, motivo_recusa } });
+        showToast(aprovar ? 'Replanejamento aprovado!' : 'Replanejamento recusado', 'ok');
+        carregarAprovacoes();
+      } catch (e) { showToast('❌ ' + e.message, 'err'); }
+    }
+
+    // ── Init ─────────────────────────────────────────────────────────────────
+    document.getElementById('f-data-inicio').value = new Date().toISOString().slice(0, 10);
+    carregarUsuariosSelect();
+    carregarAprovacoes();
+    setInterval(carregarAprovacoes, 60000);
+  </script>
+</body>
+</html>

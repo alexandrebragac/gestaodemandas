@@ -774,6 +774,10 @@ document.getElementById('modal-stats').addEventListener('click', (e) => {
     const navAdmin = document.getElementById('nav-admin');
     if (navAdmin) navAdmin.style.display = '';
   }
+  if (currentUser.perfil === 'admin' || currentUser.pode_criar_atividades) {
+    const navGestaoAtiv = document.getElementById('nav-gestao-atividades');
+    if (navGestaoAtiv) navGestaoAtiv.style.display = '';
+  }
 
   // Mostra usuário logado no header
   const headerInner = document.querySelector('.header-inner');

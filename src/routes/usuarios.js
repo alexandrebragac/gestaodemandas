@@ -73,6 +73,15 @@ router.post('/:id/boas-vindas', authMiddleware, adminOnly, async (req, res) => {
   }
 });
 
+// PUT /usuarios/:id/gestor-atividades — admin concede/revoga permissão de criar atividades
+router.put('/:id/gestor-atividades', authMiddleware, adminOnly, (req, res) => {
+  const db = getDb();
+  const u = db.prepare('SELECT * FROM usuarios WHERE id = ?').get(req.params.id);
+  if (!u) return res.status(404).json({ erro: 'Usuário não encontrado' });
+  db.prepare('UPDATE usuarios SET pode_criar_atividades = ? WHERE id = ?').run(req.body.pode_criar_atividades ? 1 : 0, req.params.id);
+  res.json(db.prepare('SELECT * FROM usuarios WHERE id = ?').get(req.params.id));
+});
+
 // DELETE /usuarios/:id
 router.delete('/:id', (req, res) => {
   const db = getDb();

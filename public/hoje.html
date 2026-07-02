@@ -51,6 +51,8 @@
     <a href="/" class="nav-tab" id="nav-dashboard">Dashboard</a>
     <a href="/calendario.html" class="nav-tab">📅 Calendário</a>
     <a href="/hoje.html" class="nav-tab active">☀️ Hoje</a>
+    <a href="/atividades.html" class="nav-tab">🗒️ Atividades</a>
+    <a href="/atividades-gestao.html" class="nav-tab" id="nav-gestao-atividades" style="display:none">✅ Gestão de Atividades</a>
     <a href="/configuracoes.html" class="nav-tab">⚙️ Configurações</a>
     <a href="/admin.html" class="nav-tab" id="nav-admin" style="display:none">👥 Admin</a>
   </nav>
@@ -92,6 +94,7 @@
     if (!auth?.token) location.href = '/login.html';
     const H = { 'Authorization': 'Bearer ' + auth.token, 'Content-Type': 'application/json' };
     if (auth.usuario?.perfil === 'admin') document.getElementById('nav-admin').style.display = '';
+    if (auth.usuario?.perfil === 'admin' || auth.usuario?.pode_criar_atividades) document.getElementById('nav-gestao-atividades').style.display = '';
 
     const hoje = new Date().toISOString().slice(0, 10);
     const meses = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
